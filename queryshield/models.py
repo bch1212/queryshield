@@ -144,11 +144,30 @@ class Tenant(Base):
 
     id = Column(String(64), primary_key=True, default=_new_id)
     name = Column(String(255), nullable=False)
+    owner_email = Column(String(320), nullable=True, index=True)
     tier = Column(String(32), default="starter", nullable=False)
     stripe_customer_id = Column(String(128), nullable=True)
     stripe_subscription_id = Column(String(128), nullable=True)
     queries_used_period = Column(Integer, default=0, nullable=False)
     period_started_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+class MagicLink(Base):
+    """One-shot login token emailed to the tenant owner.
+
+    The token cleartext is sent to the user; we store its sha256. Consumed
+    rows are kept (not deleted) so we can detect replay attempts.
+    """
+
+    __tablename__ = "magic_links"
+
+    id = Column(String(64), primary_key=True, default=_new_id)
+    email = Column(String(320), nullable=False, index=True)
+    token_hash = Column(String(128), nullable=False, unique=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
 

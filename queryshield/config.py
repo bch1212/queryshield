@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     # Vault
     vault_key: Optional[str] = None  # Fernet key (base64) — required in prod
+    # Optional: override session-cookie HMAC key. Defaults to a derived key
+    # off VAULT_KEY if unset. Rotating SESSION_KEY logs everyone out.
+    session_key: Optional[str] = None
 
     # Cache
     redis_url: Optional[str] = None

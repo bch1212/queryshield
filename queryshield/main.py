@@ -24,10 +24,12 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import Cookie, Depends, FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+
+from queryshield import auth as qs_auth
 
 from queryshield import __version__
 from queryshield.audit import get_agent_logs, get_tenant_logs
@@ -53,8 +55,10 @@ from queryshield.models import (
     hash_api_key,
     init_db,
 )
+from queryshield.network_safety import UnsafeDatabaseHost, assert_safe_database_url
 from queryshield.notifications import discord_alert
 from queryshield.proxy import execute_query
+from queryshield.rate_limit import check as rl_check, client_ip
 from queryshield.rls import upsert_policy
 from queryshield.vault import (
     delete_database,
@@ -115,6 +119,19 @@ app = FastAPI(
 )
 
 
+# --- Streamable-HTTP MCP transport ------------------------------------
+# Hosted agent platforms (Vercel AI, LangGraph Cloud, Cloudflare Agents, etc.)
+# can't shell out to the stdio MCP, so we also expose the same tools over
+# HTTP at /mcp. Auth: agents send their normal X-API-Key header, which the
+# MCP tools read from the request context (forwarded as bearer to /v1/query).
+try:
+    from queryshield.mcp_http import build_mcp_app
+
+    app.mount("/mcp", build_mcp_app())
+except Exception as _mcp_exc:  # noqa: BLE001
+    log.warning("MCP HTTP transport not mounted: %s", _mcp_exc)
+
+
 # --- Auth dependencies -------------------------------------------------
 
 async def _agent_from_key(x_api_key: str) -> Agent:
@@ -134,8 +151,12 @@ async def require_agent(x_api_key: str = Header(..., alias="X-API-Key")) -> Agen
 
 async def require_admin(x_admin_key: str = Header(..., alias="X-Admin-Key")) -> Agent:
     """Admin = the first agent provisioned for a tenant (name == '__admin__')."""
+    import secrets as _secrets
+
     agent = await _agent_from_key(x_admin_key)
-    if agent.name != "__admin__":
+    # Constant-time comparison so attackers can't time-side-channel the
+    # difference between "valid key, not admin" and "valid key, is admin".
+    if not _secrets.compare_digest(agent.name or "", "__admin__"):
         raise HTTPException(status_code=403, detail="admin key required for this endpoint")
     return agent
 
@@ -173,8 +194,17 @@ def ready() -> JSONResponse:
 @app.post("/v1/query", response_model=QueryResult)
 async def query_endpoint(
     request: QueryRequest,
+    http_request: Request,
     agent: Agent = Depends(require_agent),
 ):
+    ip = client_ip(http_request)
+    allowed, retry = rl_check(ip, "query", limit=120, window_sec=60)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={"reason": "ip rate limit", "retry_after_sec": retry},
+            headers={"Retry-After": str(retry)},
+        )
     allowed, info = await check_quota(agent.tenant_id)
     if not allowed:
         raise HTTPException(status_code=429, detail=info)
@@ -236,12 +266,20 @@ async def audit_tenant_endpoint(limit: int = 200, agent: Agent = Depends(require
 # --- Agent / DB / policy management ------------------------------------
 
 @app.post("/v1/tenants", response_model=AgentRegistrationResult)
-async def create_tenant(name: str):
+async def create_tenant(request: Request, name: str):
     """Boot a fresh tenant + admin agent. Open in v1 — Stripe controls cost.
 
     The returned admin key is the only key that can register databases /
     create more agents for this tenant.
     """
+    ip = client_ip(request)
+    allowed, retry = rl_check(ip, "tenants_create", limit=5, window_sec=600)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={"reason": "ip rate limit on tenant creation", "retry_after_sec": retry},
+            headers={"Retry-After": str(retry)},
+        )
     raw, prefix, digest = generate_api_key()
     with SessionLocal() as session:
         tenant = Tenant(name=name, tier="starter")
@@ -287,6 +325,10 @@ async def create_agent(reg: AgentRegistration, admin: Agent = Depends(require_ad
 
 @app.post("/v1/databases")
 async def register_database(reg: DatabaseRegistration, admin: Agent = Depends(require_admin)):
+    try:
+        assert_safe_database_url(reg.connection_string, reg.db_type)
+    except UnsafeDatabaseHost as e:
+        raise HTTPException(status_code=400, detail=f"unsafe database host: {e}")
     store_connection(
         tenant_id=admin.tenant_id,
         alias=reg.alias,
@@ -368,77 +410,232 @@ async def billing_webhook(request: Request):
         raise HTTPException(status_code=400, detail=f"webhook error: {e}")
 
 
-# --- Landing page -----------------------------------------------------
+# --- Self-serve signup + dashboard ------------------------------------
 
-LANDING_HTML_TEMPLATE = """<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>QueryShield — secure SQL proxy for AI agents</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        :root { --fg: #111; --bg: #fafafa; --accent: #2563eb; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-                color: var(--fg); background: var(--bg); line-height: 1.55; }
-        .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px; }
-        h1 { font-size: 38px; margin: 0 0 8px; letter-spacing: -0.5px; }
-        .tag { color: #555; margin: 0 0 32px; font-size: 18px; }
-        h2 { font-size: 22px; margin: 36px 0 8px; }
-        code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
-        pre { background: #111; color: #eee; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
-        a { color: var(--accent); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .pill { display: inline-block; background: #eef2ff; color: var(--accent);
-                padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-right: 6px; }
-    </style>
-</head>
-<body>
-<div class="wrap">
-    <h1>QueryShield</h1>
-    <p class="tag">A secure proxy between your AI agents and your databases. Agents send natural language; we validate, translate, enforce row-level security, and audit every call.</p>
-
-    <p>
-        <span class="pill">SELECT-only AST validator</span>
-        <span class="pill">Per-agent RLS</span>
-        <span class="pill">Append-only audit</span>
-        <span class="pill">MCP-native</span>
-    </p>
-
-    <h2>Quickstart</h2>
-    <pre><code>curl -X POST __BASE__/v1/tenants?name=Acme
-
-# response → { agent_id, api_key (admin), tenant_id }
-
-curl -X POST __BASE__/v1/databases \\
-  -H 'X-Admin-Key: qs_...' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"alias":"prod","db_type":"postgresql","connection_string":"postgresql://..."}'
-
-curl -X POST __BASE__/v1/query \\
-  -H 'X-API-Key: qs_...' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"database_alias":"prod","query":"how many users signed up last week","mode":"nl","max_rows":10}'</code></pre>
-
-    <h2>Connect via MCP</h2>
-    <p>Add to your Claude Desktop / Cursor / agent config:</p>
-    <pre><code>{
-  "queryshield": {
-    "command": "python",
-    "args": ["-m", "queryshield.mcp_server"],
-    "env": { "QUERYSHIELD_API_KEY": "qs_..." }
-  }
-}</code></pre>
-
-    <p style="margin-top: 48px; color: #888; font-size: 13px;">
-        Docs at <a href="/docs">/docs</a> · Health at <a href="/health">/health</a>
-    </p>
-</div>
-</body>
-</html>
-"""
+from queryshield.web import (
+    DASHBOARD_HTML,
+    LANDING_HTML,
+    LOGIN_HTML,
+    SIGNUP_RESULT_HTML,
+    VERIFY_FAILED_HTML,
+)
 
 
 @app.get("/", response_class=HTMLResponse)
 def landing() -> str:
-    return LANDING_HTML_TEMPLATE.replace("__BASE__", get_settings().public_base_url)
+    return LANDING_HTML.replace("__BASE__", get_settings().public_base_url)
+
+
+@app.post("/signup", response_class=HTMLResponse)
+async def signup_handler(request: Request, email: str = Form(...), workspace: str = Form("")):
+    ip = client_ip(request)
+    allowed, retry = rl_check(ip, "signup", limit=5, window_sec=600)
+    if not allowed:
+        return HTMLResponse(
+            LOGIN_HTML.replace(
+                "__ERROR__",
+                f"Too many signups from your network. Try again in {retry}s.",
+            ),
+            status_code=429,
+            headers={"Retry-After": str(retry)},
+        )
+    try:
+        tenant_id, _agent_id, api_key, token = qs_auth.signup(email, workspace or None)
+    except ValueError as e:
+        return HTMLResponse(LOGIN_HTML.replace("__ERROR__", str(e)), status_code=400)
+
+    base = get_settings().public_base_url.rstrip("/")
+    is_new = api_key.startswith("qs_")  # signup() returns "(unchanged…)" if pre-existing
+    qs_auth.send_magic_link_email(email, token, is_new_signup=is_new, api_key=api_key if is_new else None)
+
+    if is_new:
+        body = (
+            SIGNUP_RESULT_HTML
+            .replace("__EMAIL__", email)
+            .replace("__API_KEY__", api_key)
+            .replace("__BASE__", base)
+        )
+        return HTMLResponse(body)
+    return HTMLResponse(
+        LOGIN_HTML.replace(
+            "__ERROR__",
+            "Welcome back — we sent you a fresh magic link. Check your inbox.",
+        )
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form() -> str:
+    return LOGIN_HTML.replace("__ERROR__", "")
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_handler(request: Request, email: str = Form(...)):
+    """Send a magic link to an existing tenant owner. Silent for unknown emails
+    so we don't leak which addresses have accounts."""
+    ip = client_ip(request)
+    allowed, retry = rl_check(ip, "login", limit=10, window_sec=600)
+    if not allowed:
+        return HTMLResponse(
+            LOGIN_HTML.replace("__ERROR__", f"Too many requests. Try again in {retry}s."),
+            status_code=429,
+            headers={"Retry-After": str(retry)},
+        )
+    email = email.lower().strip()
+    if qs_auth._looks_like_email(email):
+        with SessionLocal() as session:
+            tenant = session.execute(
+                select(Tenant).where(Tenant.owner_email == email)
+            ).scalar_one_or_none()
+        if tenant is not None:
+            token = qs_auth.issue_magic_link(email, tenant.id)
+            qs_auth.send_magic_link_email(email, token, is_new_signup=False)
+    # Always succeed — no enumeration of registered emails.
+    return HTMLResponse(
+        LOGIN_HTML.replace(
+            "__ERROR__", "If that email has an account, we just sent you a link."
+        )
+    )
+
+
+@app.get("/auth/verify")
+async def auth_verify(token: str = ""):
+    tenant_id = qs_auth.consume_magic_link(token)
+    if tenant_id is None:
+        return HTMLResponse(VERIFY_FAILED_HTML, status_code=400)
+    cookie = qs_auth.issue_session(tenant_id)
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(
+        qs_auth.SESSION_COOKIE,
+        cookie,
+        max_age=qs_auth.SESSION_TTL_DAYS * 86400,
+        httponly=True,
+        secure=get_settings().is_production,
+        samesite="lax",
+    )
+    return response
+
+
+@app.get("/auth/logout")
+async def auth_logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(qs_auth.SESSION_COOKIE)
+    return response
+
+
+def _require_session(qs_session: str | None = Cookie(default=None, alias=qs_auth.SESSION_COOKIE)) -> str:
+    tenant_id = qs_auth.verify_session(qs_session)
+    if tenant_id is None:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    return tenant_id
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(qs_session: str | None = Cookie(default=None, alias=qs_auth.SESSION_COOKIE)):
+    tenant_id = qs_auth.verify_session(qs_session)
+    if tenant_id is None:
+        return RedirectResponse(url="/login", status_code=303)
+    return HTMLResponse(DASHBOARD_HTML)
+
+
+@app.get("/dashboard/data")
+async def dashboard_data(tenant_id: str = Depends(_require_session)):
+    """JSON snapshot for the dashboard page."""
+    from queryshield.audit import get_tenant_logs as _get_logs
+    from queryshield.billing import TIER_LIMITS
+
+    with SessionLocal() as session:
+        tenant = session.get(Tenant, tenant_id)
+        if tenant is None:
+            raise HTTPException(status_code=404)
+        agents = session.execute(
+            select(Agent).where(Agent.tenant_id == tenant_id)
+        ).scalars().all()
+        agents_data = [
+            {
+                "id": a.id,
+                "name": a.name,
+                "key_prefix": a.api_key_prefix,
+                "active": a.active,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in agents
+        ]
+        tier = tenant.tier or "starter"
+        limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
+
+    databases = list_databases(tenant_id)
+    logs = await _get_logs(tenant_id, limit=25)
+    return {
+        "tenant": {
+            "id": tenant_id,
+            "name": tenant.name,
+            "owner_email": tenant.owner_email,
+            "tier": tier,
+            "queries_used": tenant.queries_used_period,
+            "queries_limit": limits["queries_per_month"],
+            "databases_limit": limits["databases"],
+        },
+        "agents": agents_data,
+        "databases": databases,
+        "audit": [r.model_dump(mode="json") for r in logs],
+    }
+
+
+@app.post("/dashboard/agents/rotate")
+async def dashboard_rotate(agent_id: str = Form(...), tenant_id: str = Depends(_require_session)):
+    """Rotate an agent's API key. Returns the cleartext once."""
+    raw, prefix, digest = generate_api_key()
+    with SessionLocal() as session:
+        agent = session.get(Agent, agent_id)
+        if agent is None or agent.tenant_id != tenant_id:
+            raise HTTPException(status_code=404)
+        agent.api_key_hash = digest
+        agent.api_key_prefix = prefix
+        session.commit()
+    return {"agent_id": agent_id, "api_key": raw}
+
+
+@app.post("/dashboard/agents")
+async def dashboard_create_agent(name: str = Form(...), tenant_id: str = Depends(_require_session)):
+    raw, prefix, digest = generate_api_key()
+    with SessionLocal() as session:
+        agent = Agent(
+            tenant_id=tenant_id,
+            name=name or "agent",
+            api_key_hash=digest,
+            api_key_prefix=prefix,
+        )
+        session.add(agent)
+        session.commit()
+        return {"agent_id": agent.id, "api_key": raw, "name": agent.name}
+
+
+@app.post("/dashboard/databases")
+async def dashboard_register_database(
+    alias: str = Form(...),
+    db_type: str = Form(...),
+    connection_string: str = Form(...),
+    tenant_id: str = Depends(_require_session),
+):
+    try:
+        assert_safe_database_url(connection_string, db_type)
+    except UnsafeDatabaseHost as e:
+        raise HTTPException(status_code=400, detail=f"unsafe database host: {e}")
+    try:
+        store_connection(
+            tenant_id=tenant_id,
+            alias=alias,
+            db_type=db_type,
+            connection_string=connection_string,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"alias": alias, "ok": True}
+
+
+@app.delete("/dashboard/databases/{alias}")
+async def dashboard_delete_database(alias: str, tenant_id: str = Depends(_require_session)):
+    if not delete_database(tenant_id, alias):
+        raise HTTPException(status_code=404)
+    return {"alias": alias, "deleted": True}

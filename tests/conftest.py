@@ -33,12 +33,15 @@ os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test"
 def control_db():
     """Init the control plane schema fresh for every test."""
     from queryshield.config import get_settings
+    from queryshield.rate_limit import _BUCKETS
 
     get_settings.cache_clear()  # type: ignore[attr-defined]
     from queryshield.models import Base, ENGINE
 
     Base.metadata.drop_all(bind=ENGINE)
     Base.metadata.create_all(bind=ENGINE)
+    # Clear in-process rate-limit buckets so tests don't get throttled.
+    _BUCKETS.clear()
     yield
     Base.metadata.drop_all(bind=ENGINE)
 
