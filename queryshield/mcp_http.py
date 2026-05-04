@@ -131,11 +131,12 @@ def build_mcp_app():  # type: ignore[no-untyped-def]
         rows = await get_agent_logs(agent.tenant_id, agent.id, limit)
         return {"entries": [r.model_dump(mode="json") for r in rows]}
 
-    # Build a Starlette ASGI app from FastMCP and wrap it with our auth
-    # middleware so we can bind the agent into a ContextVar.
+    # Build a Starlette ASGI app from FastMCP. We pass path="/" so the
+    # MCP endpoint sits at the root of this sub-app — once we mount it under
+    # /mcp in FastAPI, the public URL is /mcp/ (not /mcp/mcp/).
     # FastMCP 3.x renamed `streamable_http_app()` -> `http_app(transport=...)`.
     if hasattr(mcp, "http_app"):
-        asgi_app = mcp.http_app(transport="streamable-http")
+        asgi_app = mcp.http_app(path="/", transport="streamable-http")
     else:
         asgi_app = mcp.streamable_http_app()  # type: ignore[attr-defined]
 
@@ -153,6 +154,10 @@ def build_mcp_app():  # type: ignore[no-untyped-def]
         finally:
             _AGENT.reset(token)
 
+    # Expose the inner app's lifespan so FastAPI can chain it. FastMCP's
+    # task group is initialized inside its lifespan; without this, the first
+    # request crashes with "Task group is not initialized".
+    auth_middleware.lifespan = getattr(asgi_app, "lifespan", None)  # type: ignore[attr-defined]
     return auth_middleware
 
 

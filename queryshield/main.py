@@ -89,6 +89,9 @@ def _validate_production_config() -> None:
         raise RuntimeError(msg)
 
 
+_MCP_LIFESPAN = None  # populated below if MCP transport is mounted
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _validate_production_config()
@@ -101,10 +104,21 @@ async def lifespan(app: FastAPI):
         log.exception("init_db failed at startup: %s", e)
     if settings.is_production:
         discord_alert("QueryShield boot", f"v{__version__} — env={settings.env}", "info")
-    try:
-        yield
-    finally:
-        log.info("QueryShield shutting down")
+
+    # Chain FastMCP's lifespan so its internal task group is alive while
+    # we serve. Without this, /mcp/ requests crash with "Task group is not
+    # initialized."
+    if _MCP_LIFESPAN is not None:
+        async with _MCP_LIFESPAN(app):
+            try:
+                yield
+            finally:
+                log.info("QueryShield shutting down")
+    else:
+        try:
+            yield
+        finally:
+            log.info("QueryShield shutting down")
 
 
 app = FastAPI(
@@ -127,7 +141,9 @@ app = FastAPI(
 try:
     from queryshield.mcp_http import build_mcp_app
 
-    app.mount("/mcp", build_mcp_app())
+    _mcp_app = build_mcp_app()
+    app.mount("/mcp", _mcp_app)
+    _MCP_LIFESPAN = getattr(_mcp_app, "lifespan", None)  # noqa: F811
 except Exception as _mcp_exc:  # noqa: BLE001
     log.warning("MCP HTTP transport not mounted: %s", _mcp_exc)
 
