@@ -1,6 +1,0 @@
-# Force Railway to use Nixpacks instead of detecting our packages/queryshield-mcp/Dockerfile.
-[start]
-cmd = "python -m queryshield.start"
-
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
