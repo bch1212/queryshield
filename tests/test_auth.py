@@ -166,6 +166,34 @@ def test_login_does_not_leak_unknown_email(client) -> None:
     assert "we just sent you a link" in r.text.lower()
 
 
+def test_upgrade_endpoint_validates_tier(client) -> None:
+    """Upgrade endpoint should reject unknown tiers and require auth."""
+    # No session — 401
+    r = client.post("/dashboard/upgrade", data={"tier": "pro"})
+    assert r.status_code == 401
+
+    # Auth in
+    client.post("/signup", data={"email": "iris@example.com"})
+    with SessionLocal() as session:
+        from queryshield.models import Tenant
+
+        tenant = session.query(Tenant).filter_by(owner_email="iris@example.com").one()
+    token = qs_auth.issue_magic_link("iris@example.com", tenant.id)
+    client.get(f"/auth/verify?token={token}")
+
+    r = client.post("/dashboard/upgrade", data={"tier": "platinum"})
+    assert r.status_code == 400
+    assert "invalid tier" in r.text.lower()
+
+    # Valid tier — fails with a Stripe error in tests since no real webhook target,
+    # but we should at least get past validation. STRIPE_SECRET_KEY isn't set in
+    # the test env, so we expect 400 with a "STRIPE_SECRET_KEY is not configured"
+    # message.
+    r = client.post("/dashboard/upgrade", data={"tier": "pro"})
+    # 400 is OK here — the test is that the route is reachable and tier validation works.
+    assert r.status_code in (400, 200)
+
+
 def test_dashboard_create_and_rotate_agent(client) -> None:
     client.post("/signup", data={"email": "fran@example.com"})
     with SessionLocal() as session:

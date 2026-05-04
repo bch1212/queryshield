@@ -655,3 +655,26 @@ async def dashboard_delete_database(alias: str, tenant_id: str = Depends(_requir
     if not delete_database(tenant_id, alias):
         raise HTTPException(status_code=404)
     return {"alias": alias, "deleted": True}
+
+
+@app.post("/dashboard/upgrade")
+async def dashboard_upgrade(
+    request: Request,
+    tier: str = Form(...),
+    tenant_id: str = Depends(_require_session),
+):
+    """Self-serve upgrade — return a Stripe Checkout URL for the chosen tier.
+
+    The dashboard JS POSTs here, then redirects the browser to ``checkout_url``.
+    Stripe webhook flips the tenant's tier on ``checkout.session.completed``.
+    """
+    if tier not in {"starter", "pro", "enterprise"}:
+        raise HTTPException(status_code=400, detail="invalid tier")
+    base = get_settings().public_base_url.rstrip("/")
+    success_url = f"{base}/dashboard?upgraded={tier}"
+    cancel_url = f"{base}/dashboard"
+    try:
+        url = create_checkout_session(tenant_id, tier, success_url, cancel_url)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"checkout_url": url}

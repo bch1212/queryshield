@@ -1,5 +1,7 @@
 # QueryShield
 
+[![tests](https://github.com/bch1212/queryshield/actions/workflows/test.yml/badge.svg)](https://github.com/bch1212/queryshield/actions/workflows/test.yml)
+
 Secure SQL proxy between AI agents and enterprise databases.
 
 Agents call a single endpoint in plain English (or structured SQL). QueryShield:

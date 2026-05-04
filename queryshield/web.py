@@ -307,8 +307,16 @@ DASHBOARD_HTML = (
     <h1 id="workspace">Loading…</h1>
     <p class="muted" id="owner"></p>
 
+    <div id="upgrade-banner" class="card" style="display:none; background:#ecfdf5; border-color:#10b981;">
+        <strong>You're on the new tier.</strong> Stripe processed your subscription successfully.
+    </div>
+
     <div class="stat-row">
-        <div class="card"><p class="muted" style="margin:0">Tier</p><p class="stat" id="tier">—</p></div>
+        <div class="card">
+            <p class="muted" style="margin:0">Tier</p>
+            <p class="stat" id="tier">—</p>
+            <div id="upgrade-actions" style="margin-top:8px;"></div>
+        </div>
         <div class="card"><p class="muted" style="margin:0">Queries this period</p><p class="stat" id="queries">—</p></div>
         <div class="card"><p class="muted" style="margin:0">Databases</p><p class="stat" id="dbcount">—</p></div>
     </div>
@@ -380,6 +388,21 @@ async function load() {
         d.tenant.queries_used.toLocaleString() + " / " + d.tenant.queries_limit.toLocaleString();
     document.getElementById("dbcount").textContent =
         d.databases.length + " / " + (d.tenant.databases_limit > 1000 ? "∞" : d.tenant.databases_limit);
+
+    // Upgrade actions — show buttons for tiers above the current one.
+    const TIERS = [["pro","Pro · $1,500/mo"],["enterprise","Enterprise · $3,500/mo"]];
+    const upgradeBox = document.getElementById("upgrade-actions");
+    const idx = ["starter","pro","enterprise"].indexOf(d.tenant.tier);
+    upgradeBox.innerHTML = TIERS.slice(idx).map(([t,label]) =>
+        `<button class="btn secondary" style="margin-right:6px; margin-top:4px;"
+                 onclick="upgrade('${t}')">Upgrade to ${label.split(' · ')[0]}</button>`
+    ).join("");
+
+    // Show the success banner if we just came back from Stripe Checkout.
+    const params = new URLSearchParams(location.search);
+    if (params.get("upgraded")) {
+        document.getElementById("upgrade-banner").style.display = "block";
+    }
 
     const agents = document.querySelector("#agents-table tbody");
     agents.innerHTML = d.agents.map(a => `
@@ -462,6 +485,19 @@ async function deleteDb(alias) {
     if (!confirm(`Remove database "${alias}"? Stored credentials will be deleted.`)) return;
     await fetch("/dashboard/databases/" + encodeURIComponent(alias), { method: "DELETE", credentials: "same-origin" });
     load();
+}
+
+async function upgrade(tier) {
+    const fd = new FormData(); fd.append("tier", tier);
+    const r = await fetch("/dashboard/upgrade", { method: "POST", body: fd, credentials: "same-origin" });
+    if (!r.ok) {
+        alert("Upgrade failed: " + (await r.text()));
+        return;
+    }
+    const d = await r.json();
+    if (d.checkout_url) {
+        window.location = d.checkout_url;
+    }
 }
 
 load();
