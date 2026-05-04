@@ -44,7 +44,14 @@ class Settings(BaseSettings):
     # Notifications
     sendgrid_api_key: Optional[str] = None
     sendgrid_from: str = "alerts@queryshield.io"
-    discord_webhook_url: Optional[str] = None
+    # Per-product Discord webhook so QueryShield's alerts go to its own
+    # channel, not the shared one used by AgentFetch / salesbot.
+    query_shield_discord_webhook_url: Optional[str] = None
+
+    @property
+    def discord_webhook_url(self) -> Optional[str]:
+        """Back-compat alias used by notifications.py."""
+        return self.query_shield_discord_webhook_url
 
     # Runtime
     port: int = 8000
