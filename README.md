@@ -194,3 +194,5 @@ python -m pytest tests/
   blocked DML, RLS row filtering, table whitelist, cache hit)
 - HTTP integration via FastAPI TestClient (7 cases — full provisioning →
   query flow, scoped agent with RLS, auth failures)
+
+<!-- auto-deploy verification: 2026-05-04T16:20:07Z -->
