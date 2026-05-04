@@ -133,7 +133,11 @@ def build_mcp_app():  # type: ignore[no-untyped-def]
 
     # Build a Starlette ASGI app from FastMCP and wrap it with our auth
     # middleware so we can bind the agent into a ContextVar.
-    asgi_app = mcp.streamable_http_app()
+    # FastMCP 3.x renamed `streamable_http_app()` -> `http_app(transport=...)`.
+    if hasattr(mcp, "http_app"):
+        asgi_app = mcp.http_app(transport="streamable-http")
+    else:
+        asgi_app = mcp.streamable_http_app()  # type: ignore[attr-defined]
 
     async def auth_middleware(scope, receive, send):  # type: ignore[no-untyped-def]
         if scope.get("type") != "http":

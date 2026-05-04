@@ -250,8 +250,45 @@ SessionLocal = sessionmaker(bind=ENGINE, autoflush=False, expire_on_commit=False
 
 
 def init_db() -> None:
-    """Create tables if missing — safe to call on every boot."""
+    """Create tables if missing + apply lightweight column-add migrations.
+
+    SQLAlchemy ``create_all`` is a no-op for existing tables, so when we
+    add a column we have to ALTER TABLE explicitly. We keep this list short
+    and idempotent — when it grows, switch to Alembic.
+    """
     Base.metadata.create_all(bind=ENGINE)
+    _apply_column_migrations()
+
+
+def _apply_column_migrations() -> None:
+    from sqlalchemy import text
+
+    # (table, column, type) — Postgres-flavored. Each statement uses
+    # ADD COLUMN IF NOT EXISTS so the boot is safe to retry.
+    migrations = [
+        ("tenants", "owner_email", "VARCHAR(320)"),
+    ]
+    dialect = ENGINE.dialect.name  # "postgresql" | "sqlite" | ...
+    if dialect not in {"postgresql", "sqlite"}:
+        return
+    with ENGINE.begin() as conn:
+        for table, column, coltype in migrations:
+            if dialect == "postgresql":
+                conn.execute(text(
+                    f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {coltype}'
+                ))
+            else:
+                # SQLite: PRAGMA + skip-if-exists check
+                row = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+                cols = {r[1] for r in row}
+                if column not in cols:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {coltype}'))
+    # Best-effort index on the new column (helps the email lookup path).
+    if dialect == "postgresql":
+        with ENGINE.begin() as conn:
+            conn.execute(text(
+                'CREATE INDEX IF NOT EXISTS ix_tenants_owner_email ON tenants(owner_email)'
+            ))
 
 
 def generate_api_key() -> tuple[str, str, str]:
