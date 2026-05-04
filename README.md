@@ -85,6 +85,29 @@ curl -X POST localhost:8000/v1/query \
 
 ## MCP integration
 
+**Listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=queryshield) as `io.github.bch1212/queryshield`.**
+
+Install the client:
+
+```bash
+pip install queryshield-mcp
+```
+
+Then drop this into your Claude Desktop / Cursor / agent config:
+
+```json
+{
+  "queryshield": {
+    "command": "queryshield-mcp",
+    "env": { "QUERYSHIELD_API_KEY": "qs_..." }
+  }
+}
+```
+
+Source for the standalone PyPI package lives in `packages/queryshield-mcp/`.
+
+## MCP integration (legacy)
+
 Drop this into any MCP-aware client (Claude Desktop, Cursor, custom agents):
 
 ```json

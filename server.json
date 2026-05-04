@@ -1,29 +1,22 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.bch1212/queryshield",
-  "description": "Secure SQL proxy for AI agents. Translates NL → SQL via Claude, validates at the AST level (no DDL/DML), enforces per-agent row-level security, and audit-logs every query.",
-  "version": "1.0.0",
+  "description": "Secure SQL proxy for AI agents — NL→SQL, AST safety, per-agent RLS, audit log.",
+  "version": "1.0.1",
   "repository": {
     "url": "https://github.com/bch1212/queryshield",
     "source": "github"
   },
-  "homepage": "https://queryshield.dev",
-  "remotes": [
+  "packages": [
     {
-      "type": "stdio",
-      "command": "python",
-      "args": ["-m", "queryshield.mcp_server"],
-      "env": [
-        {"name": "QUERYSHIELD_API_KEY", "description": "Agent API key issued by QueryShield. See https://queryshield.dev for provisioning.", "required": true},
-        {"name": "QUERYSHIELD_BASE_URL", "description": "Override the default https://api.queryshield.dev for self-hosted deploys.", "required": false}
+      "registryType": "pypi",
+      "identifier": "queryshield-mcp",
+      "version": "1.0.1",
+      "transport": {"type": "stdio"},
+      "environmentVariables": [
+        {"name": "QUERYSHIELD_API_KEY", "description": "Agent API key issued by QueryShield.", "isRequired": true, "isSecret": true},
+        {"name": "QUERYSHIELD_BASE_URL", "description": "Override the default endpoint.", "isRequired": false}
       ]
     }
-  ],
-  "tools": [
-    {"name": "query_database", "description": "Run a natural-language question against a registered database."},
-    {"name": "query_database_sql", "description": "Run a structured SELECT against a registered database (no LLM step)."},
-    {"name": "get_audit_log", "description": "Return recent audit entries for the calling agent."}
-  ],
-  "license": "MIT",
-  "author": {"name": "Brett Halverson", "url": "https://github.com/bch1212"}
+  ]
 }

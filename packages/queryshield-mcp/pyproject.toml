@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "queryshield-mcp"
+version = "1.0.1"
+description = "MCP client for QueryShield — secure SQL proxy for AI agents"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Brett Halverson", email = "brett.halverson@gmail.com" },
+]
+keywords = ["mcp", "sql", "agent", "claude", "security", "row-level-security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Security",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=0.4.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+queryshield-mcp = "queryshield_mcp.server:main"
+
+[project.urls]
+Homepage = "https://queryshield.dev"
+Repository = "https://github.com/bch1212/queryshield"
+Issues = "https://github.com/bch1212/queryshield/issues"
