@@ -108,6 +108,8 @@ Then drop this into your Claude Desktop / Cursor / agent config:
 
 Source for the standalone PyPI package lives in `packages/queryshield-mcp/`.
 
+For MCP directory evaluators such as Glama, the repository root also includes a slim `Dockerfile` that launches the published `queryshield-mcp` stdio server for tool introspection. The container does not need `QUERYSHIELD_API_KEY` for MCP initialization/tool discovery; the key is only required when a discovered tool is actually invoked against a QueryShield API tenant.
+
 ## MCP integration (legacy)
 
 Drop this into any MCP-aware client (Claude Desktop, Cursor, custom agents):
