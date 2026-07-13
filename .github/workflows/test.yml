@@ -46,3 +46,79 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
+
+  docker-mcp-introspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Glama MCP Docker image
+        run: docker build -t queryshield-glama-check:ci .
+
+      - name: Verify stdio MCP initialize and tool discovery
+        run: |
+          python - <<'PY'
+          import json
+          import select
+          import subprocess
+          import time
+
+          proc = subprocess.Popen(
+              ["docker", "run", "--rm", "-i", "queryshield-glama-check:ci"],
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True,
+          )
+
+          def send(message):
+              assert proc.stdin is not None
+              proc.stdin.write(json.dumps(message) + "\n")
+              proc.stdin.flush()
+
+          def read_until(predicate, timeout=20):
+              assert proc.stdout is not None
+              assert proc.stderr is not None
+              deadline = time.time() + timeout
+              stdout = ""
+              stderr = ""
+              while time.time() < deadline:
+                  readable, _, _ = select.select([proc.stdout, proc.stderr], [], [], 0.2)
+                  for stream in readable:
+                      line = stream.readline()
+                      if stream is proc.stdout:
+                          stdout += line
+                      else:
+                          stderr += line
+                  if predicate(stdout):
+                      return stdout, stderr
+              raise AssertionError(f"timed out waiting for MCP response\nstdout={stdout}\nstderr={stderr}")
+
+          send({
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "initialize",
+              "params": {
+                  "protocolVersion": "2025-06-18",
+                  "capabilities": {},
+                  "clientInfo": {"name": "queryshield-ci", "version": "0.0.1"},
+              },
+          })
+          stdout, _ = read_until(lambda out: '"id":1' in out)
+          assert '"serverInfo"' in stdout
+
+          send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+          send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+          stdout, _ = read_until(lambda out: '"id":2' in out)
+          assert "query_database" in stdout
+          assert "query_database_sql" in stdout
+          assert "get_audit_log" in stdout
+
+          proc.terminate()
+          try:
+              proc.wait(timeout=5)
+          except subprocess.TimeoutExpired:
+              proc.kill()
+          PY
