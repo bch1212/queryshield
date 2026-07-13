@@ -1,9 +1,3 @@
-# Glama-only stdio MCP Dockerfile.
-# Railway production queryshield-api must use Nixpacks + railway.json; if this
-# root Dockerfile is included, Railway auto-selects Dockerfile mode and builds
-# the standalone queryshield-mcp image instead of the API app.
-Dockerfile
-
 # Local artifacts that should never be uploaded to Railway.
 queryshield_local.db
 queryshield_local.db-journal
