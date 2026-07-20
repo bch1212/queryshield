@@ -54,6 +54,61 @@ LANDING_HTML = (
     <meta charset="utf-8">
     <title>QueryShield — secure SQL proxy for AI agents</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="QueryShield is a secure SQL proxy for AI agents: send natural language, get SELECT-only validated SQL with per-agent row-level security and full audit. Your LLM agents never see database credentials.">
+    <link rel="canonical" href="https://queryshield.dev/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="QueryShield">
+    <meta property="og:title" content="QueryShield — secure SQL proxy for AI agents">
+    <meta property="og:description" content="A secure proxy between your AI agents and your databases. SELECT-only AST validation, per-agent row-level security, and append-only audit. Agents never see connection strings.">
+    <meta property="og:url" content="https://queryshield.dev/">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="QueryShield — secure SQL proxy for AI agents">
+    <meta name="twitter:description" content="Secure database access control for LLM agents: natural language in, safe validated SQL out, with per-agent RLS and full audit.">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "QueryShield",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Any",
+      "description": "A secure SQL proxy and database access control layer for AI agents. Translates natural language to SELECT-only validated SQL, enforces per-agent row-level security, and audit-logs every query. MCP-native.",
+      "url": "https://queryshield.dev/",
+      "offers": { "@type": "Offer", "price": "500", "priceCurrency": "USD" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does QueryShield protect a database from AI agents?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "QueryShield sits between your AI agents and your databases as a secure proxy. It validates every query at the AST level (SELECT-only, no stacked statements, no forbidden functions), applies per-agent row-level security, and audit-logs every call. Agents never see connection strings."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can AI agents run DELETE, DROP, or UPDATE through QueryShield?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. QueryShield's AST validator only allows SELECT statements. INSERT, UPDATE, DELETE, DROP, and stacked statements are rejected before they ever reach your database."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does QueryShield work with the Model Context Protocol (MCP)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. QueryShield is MCP-native and listed in the official MCP Registry. Install queryshield-mcp and drop it into Claude Desktop, Cursor, or any MCP-aware client."
+          }
+        }
+      ]
+    }
+    </script>
     <style>"""
     + _BASE_CSS
     + """

@@ -25,7 +25,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Cookie, Depends, FastAPI, Form, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -440,6 +440,33 @@ from queryshield.web import (
 @app.get("/", response_class=HTMLResponse)
 def landing() -> str:
     return LANDING_HTML.replace("__BASE__", get_settings().public_base_url)
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt() -> str:
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /auth/\n"
+        "Disallow: /v1/\n"
+        "\n"
+        "Sitemap: https://queryshield.dev/sitemap.xml\n"
+    )
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml() -> Response:
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url><loc>https://queryshield.dev/</loc>"
+        "<changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        "  <url><loc>https://queryshield.dev/login</loc>"
+        "<changefreq>monthly</changefreq><priority>0.5</priority></url>\n"
+        "</urlset>\n"
+    )
+    return Response(content=xml, media_type="application/xml")
 
 
 @app.post("/signup", response_class=HTMLResponse)

@@ -1,0 +1,11 @@
+keyword,location,device,position,previous_position,delta,ranking_url,status
+secure SQL proxy for AI agents,US,desktop,1,,new,https://queryshield.dev/,baseline
+database access control for LLM agents,US,desktop,NR,,new,,baseline
+read only SQL proxy AI,US,desktop,NR,,new,,baseline
+protect database from AI agents,US,desktop,NR,,new,,baseline
+query firewall for AI,US,desktop,NR,,new,,baseline
+safe database access for AI agents,US,desktop,NR,,new,,baseline
+SQL guardrails for LLM,US,desktop,NR,,new,,baseline
+QueryShield,US,desktop,3,,new,https://queryshield.dev/,baseline
+text to SQL security,US,desktop,NR,,new,,baseline
+AI agent database permissions,US,desktop,NR,,new,,baseline
