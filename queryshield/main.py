@@ -429,11 +429,14 @@ async def billing_webhook(request: Request):
 # --- Self-serve signup + dashboard ------------------------------------
 
 from queryshield.web import (
+    AEO_GUIDES_ORDER,
     DASHBOARD_HTML,
     LANDING_HTML,
     LOGIN_HTML,
     SIGNUP_RESULT_HTML,
     VERIFY_FAILED_HTML,
+    render_guide,
+    render_guides_index,
 )
 
 
@@ -457,16 +460,37 @@ def robots_txt() -> str:
 
 @app.get("/sitemap.xml")
 def sitemap_xml() -> Response:
+    guide_urls = "".join(
+        "  <url><loc>https://queryshield.dev/aeo/guides/" + slug + "</loc>"
+        "<changefreq>monthly</changefreq><priority>0.8</priority></url>\n"
+        for slug in AEO_GUIDES_ORDER
+    )
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         "  <url><loc>https://queryshield.dev/</loc>"
         "<changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
-        "  <url><loc>https://queryshield.dev/login</loc>"
+        "  <url><loc>https://queryshield.dev/aeo/guides</loc>"
+        "<changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
+        + guide_urls
+        + "  <url><loc>https://queryshield.dev/login</loc>"
         "<changefreq>monthly</changefreq><priority>0.5</priority></url>\n"
         "</urlset>\n"
     )
     return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/aeo/guides", response_class=HTMLResponse)
+def aeo_guides_index() -> str:
+    return render_guides_index()
+
+
+@app.get("/aeo/guides/{slug}", response_class=HTMLResponse)
+def aeo_guide(slug: str) -> Response:
+    html = render_guide(slug)
+    if html is None:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    return HTMLResponse(html)
 
 
 @app.post("/signup", response_class=HTMLResponse)
