@@ -8,7 +8,7 @@
 
 That is the headline finding, and it invalidates the "did last week's changes work?" question entirely — there was nothing live to measure. The three keywords week 3 added as targets are still NR because **the pages that target them do not exist in production.**
 
-This run's first job was recovery: week 3's work is now committed and pushed, along with this week's changes, in a single commit (`35997b4`). **Nothing is live until a human runs `railway up`** — the deploy backlog is now two weeks deep.
+This run's first job was recovery: week 3's work is now committed and pushed, along with this week's changes, in a single commit (`35997b4`). **Deploy status: initially flagged as pending per the commit-and-flag model, then authorized by Brett in-session and deployed the same day — everything in this report is now live and verified.** See the DEPLOYED section below.
 
 On rankings, the deployed surface held and improved slightly. **"prevent SQL injection from LLM generated queries" moved #2 → #1**, giving QueryShield two #1 positions on long-tail guide queries. "secure SQL proxy for AI agents" holds **#1** and the brand query holds **#5**. One genuine loss: **"RBAC for AI agents accessing a database" fell from #6 to unranked** — the only tracked position lost since the loop began.
 
@@ -89,32 +89,36 @@ All edits are marketing HTML and schema in `queryshield/web.py`. **No app logic,
 - Sitemap emits **9** `<loc>` entries.
 - **Existing test suite: 66 passed, 0 failed.**
 
-## ⚠️ DEPLOY PENDING
+## ✅ DEPLOYED — 2026-08-13
 
-Changes are **committed and pushed to GitHub `origin/main` (verified: `1f48264..35997b4`) but NOT live** on queryshield.dev. A human must trigger the Railway deploy.
+**Update to this report.** The commit-and-flag step completed as designed (committed and pushed, deploy flagged for a human), and then **Brett authorized the deploy in-session and it was executed the same day.** The two-week backlog is cleared; everything described in this report is live.
 
-**This backlog is now two weeks deep** — one deploy ships both week 3's and week 4's work.
+- Committed and pushed to `origin/main`: `1f48264..35997b4` (changes) and `35997b4..bf717e4` (this report).
+- Deployed with `railway up --service queryshield-api --ci` against project `73846f59-a7e7-4e98-b6c0-02c907252a2c` / service `300a2546-6603-443d-9a2c-30f3cd78de9d` — both IDs verified against the linked project before deploying. Result: **Deploy complete.**
 
-**Manual deploy command** (from repo root, requires a project-scoped Railway token / `railway link` to project `73846f59-a7e7-4e98-b6c0-02c907252a2c`):
+**Live verification against queryshield.dev — all passed:**
 
-```bash
-cd /Users/bretthalverson/Projects/_mcp_email_work/queryshield && railway up
-```
+| Check | Result |
+|---|---|
+| All 10 SEO routes | **200** (incl. the three guides that were 404 all week) |
+| `/aeo/guides/ai-agent-database-credentials` | **200** (was 404) |
+| `/aeo/guides/safe-production-database-access` | **200** (was 404) |
+| `/aeo/guides/query-firewall-for-ai-agents` | **200** (was 404) |
+| `sitemap.xml` `<loc>` count | **9** (was 6) |
+| Landing `twitter:card` | `summary` (QS-SEO-016 live) |
+| Landing JSON-LD blocks | **3**, incl. `Organization` (QS-SEO-015 live) |
+| Landing guide links | **6** (was 3) |
+| `/aeo/guides` | `CollectionPage` JSON-LD + `og:title` present (QS-SEO-017 live) |
+| `rbac-for-ai-agents` | `TechArticle` schema + both new sections present (QS-SEO-018/019 live) |
 
-**After deploy, verify live (all should be 200 OK):**
+**Repo/live divergence is now zero.** Six guides in the repo, six live.
 
-```bash
-for u in /aeo/guides/ai-agent-database-credentials /aeo/guides/safe-production-database-access /aeo/guides/query-firewall-for-ai-agents; do curl -s -o /dev/null -w "%{http_code} $u\n" "https://queryshield.dev$u"; done
-```
-
-- Confirm `https://queryshield.dev/sitemap.xml` lists **9** URLs (currently 6).
-- Confirm the landing `<head>` contains the `Organization` JSON-LD block and `twitter:card` reads `summary`.
-- Confirm `/aeo/guides` serves the `CollectionPage` JSON-LD and all 6 guide cards.
+**What this changes for next week's run:** the 2026-08-20 measurement is the first clean read on week 3's three guides and all of week 4's schema work. The three keywords marked `flat-undeployed` in `rankings.csv` get a real baseline for the first time — if the week-2 pattern holds (~7 days from live to ranking), they should show movement next run. Treat next week's numbers as the actual test of the guide-page strategy at 6 pages.
 
 ## Improvements NOT Made (backlog)
 
 - **An `og:image` asset.** QS-SEO-016 fixed the *mismatch* by downgrading the card, which is the honest fix without a binary asset, but a real 1200×630 OG image would be strictly better and would let the large card come back. Needs a design asset, out of scope for this loop.
-- **Submit the updated sitemap to Google Search Console.** Still no GSC access from this loop. Now the highest-value manual action *after* the pending deploy — three brand-new URLs will be waiting to be discovered.
+- **Submit the updated sitemap to Google Search Console.** Still no GSC access from this loop. Now the single highest-value manual action, and newly urgent: the deploy landed three brand-new URLs plus schema changes across six pages, all waiting to be discovered.
 - **A guide for "read only SQL proxy AI" and "SQL guardrails for LLM".** Both still NR with no dedicated page. Deliberately deferred until the deploy backlog clears; "read only SQL proxy AI" looks especially winnable, since its SERP is entirely traditional proxies (Oracle, ProxySQL) with no AI-agent-native answer.
 - **Competitive response to GateSQL.** `gatesql.dev` is new at #3 on QueryShield's #1 head term with nearly identical positioning. No action taken this run — flagging it for a human product/positioning decision rather than reacting with copy tweaks.
 - **Head-term strategy remains unresolved.** Four weeks of evidence: "query firewall for AI", "text to SQL security", and "database access control for LLM agents" are held by Akamai, Cloudflare, Oracle, IBM, Cerbos, and arXiv. On-page work has not moved any of them a single position. These need off-page authority; that is a decision for a human, not another landing-copy iteration.
@@ -125,5 +129,6 @@ for u in /aeo/guides/ai-agent-database-credentials /aeo/guides/safe-production-d
 - **Four of sixteen searches returned "web search error: unavailable" on first attempt** ("database access control for LLM agents", "protect database from AI agents", "SQL guardrails for LLM", "AI agent database permissions"). All four were retried successfully and the retried results are what this report uses. No keyword was scored from a failed search.
 - **`NR`** = not present in the top WebSearch results. **`flat-undeployed`** in rankings.csv marks the three keywords whose target pages exist in the repo but 404 in production — their NR is a deploy artifact, not a content signal.
 - **Week 3's report contained an inaccurate claim** ("committed to GitHub `origin/main`"). Its *content* work was sound and is preserved verbatim in this run's commit; only the deploy-status claim was wrong. Its ranking figures were measured against the then-live week-2 site and remain valid.
-- **Repo/live divergence is currently at its widest since the loop began**: 6 guides in the repo, 3 live. A single deploy closes it.
+- **Repo/live divergence peaked at its widest since the loop began** (6 guides in the repo, 3 live) and was **closed the same day** by the in-session deploy. As of end of this run: 6 in repo, 6 live.
+- **The three `flat-undeployed` rows in `rankings.csv` were measured before the deploy** and reflect 404 pages. They are not a content signal and should not be carried forward as a trend — 2026-08-20 is their first real baseline.
 - **No app/auth/query logic touched.** Only HTML string constants and JSON-LD builders in `web.py`.
