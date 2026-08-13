@@ -33,13 +33,13 @@ Because the deploy backlog is the binding constraint, this run deliberately stay
 | SQL guardrails for LLM | NR | NR | 0 | flat |
 | text to SQL security | NR | NR | 0 | flat |
 | AI agent database permissions | NR | NR | 0 | flat |
-| how to give an AI agent safe access to a production database | NR | NR | 0 | flat (page undeployed) |
-| what is a query firewall for AI agents | NR | NR | 0 | flat (page undeployed) |
-| how do I stop an AI agent from seeing database credentials | NR | NR | 0 | flat (page undeployed) |
+| how to give an AI agent safe access to a production database | NR | NR | 0 | flat (page was 404 at measurement) |
+| what is a query firewall for AI agents | NR | NR | 0 | flat (page was 404 at measurement) |
+| how do I stop an AI agent from seeing database credentials | NR | NR | 0 | flat (page was 404 at measurement) |
 
 - **Gained: 1** · **Lost: 1** · **New ranking URLs: 0** · **Dropped: 1** · **Flat: 13**
 - **The RBAC drop is real and worth attention.** The SERP for that query is now dominated by substantive competitors — an arXiv paper on RBAC for industrial AI agents, WorkOS, Protecto, NeuralTrust, IBM, and notably Oso's "Why RBAC is Not Enough for AI Agents." QueryShield's RBAC guide was the thinnest of the three live guides (three short sections, no counter-argument, no checklist) and it lost to depth. Addressed this run — see QS-SEO-019.
-- **Brand query detail:** for "QueryShield", queryshield.dev holds **#5** (homepage), **#7** (`/login`), **#8/#9/#10** (the three live guides), with the Glama MCP listing at #6. The academic/healthcare QueryShields still hold #1–#4. Unchanged from last week. The `Organization` + `sameAs` schema intended to fix this is written but **still not deployed**, so it has had no chance to act.
+- **Brand query detail:** for "QueryShield", queryshield.dev holds **#5** (homepage), **#7** (`/login`), **#8/#9/#10** (the three live guides), with the Glama MCP listing at #6. The academic/healthcare QueryShields still hold #1–#4. Unchanged from last week. The `Organization` + `sameAs` schema intended to fix this was **not live at measurement time**, so it had no chance to act on this week's number; it went live later the same day and gets its first real test on 2026-08-20.
 
 ## Last Week's Changes — Did They Work?
 
