@@ -48,6 +48,16 @@ tr:last-child td { border-bottom: 0; }
 .nav .links { display: flex; gap: 16px; align-items: center; }
 """
 
+# Shared schema.org Organization node. The landing page declares it inline in its
+# own JSON-LD; guide pages embed this copy so their author/publisher references
+# resolve on the page they appear on.
+_ORGANIZATION_NODE = {
+    "@type": "Organization",
+    "@id": "https://queryshield.dev/#organization",
+    "name": "QueryShield",
+    "url": "https://queryshield.dev/",
+}
+
 
 LANDING_HTML = (
     """<!doctype html>
@@ -64,7 +74,7 @@ LANDING_HTML = (
     <meta property="og:title" content="QueryShield — secure SQL proxy for AI agents">
     <meta property="og:description" content="A secure proxy between your AI agents and your databases. SELECT-only AST validation, per-agent row-level security, and append-only audit. Agents never see connection strings.">
     <meta property="og:url" content="https://queryshield.dev/">
-    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="QueryShield — secure SQL proxy for AI agents">
     <meta name="twitter:description" content="Secure database access control for LLM agents: natural language in, safe validated SQL out, with per-agent RLS and full audit.">
     <script type="application/ld+json">
@@ -76,7 +86,23 @@ LANDING_HTML = (
       "operatingSystem": "Any",
       "description": "A secure SQL proxy and database access control layer for AI agents. Translates natural language to SELECT-only validated SQL, enforces per-agent row-level security, and audit-logs every query. MCP-native.",
       "url": "https://queryshield.dev/",
-      "offers": { "@type": "Offer", "price": "500", "priceCurrency": "USD" }
+      "offers": { "@type": "Offer", "price": "500", "priceCurrency": "USD" },
+      "publisher": { "@id": "https://queryshield.dev/#organization" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://queryshield.dev/#organization",
+      "name": "QueryShield",
+      "alternateName": "QueryShield — secure SQL proxy for AI agents",
+      "url": "https://queryshield.dev/",
+      "description": "QueryShield builds a secure SQL proxy and query firewall that gives AI agents governed, least-privilege access to production databases.",
+      "sameAs": [
+        "https://github.com/bch1212/queryshield",
+        "https://glama.ai/mcp/servers/bch1212/queryshield"
+      ]
     }
     </script>
     <script type="application/ld+json">
@@ -133,6 +159,7 @@ LANDING_HTML = (
     <div class="hero">
         <h1>The security layer your AI agent stack is missing.</h1>
         <p class="tag">A secure proxy between your agents and your databases. Send natural language; get safe SQL, per-agent row-level security, and full audit. Agents never see connection strings.</p>
+        <p class="tag">QueryShield is a query firewall for AI: it gives you database access control for LLM agents without wiring text-to-SQL security into every service yourself.</p>
         <p>
             <span class="pill">SELECT-only AST validator</span>
             <span class="pill">Per-agent RLS</span>
@@ -174,12 +201,16 @@ LANDING_HTML = (
     <p>Listed in the <a href="https://registry.modelcontextprotocol.io/v0/servers?search=queryshield">official MCP Registry</a> as <span class="kbd">io.github.bch1212/queryshield</span>.</p>
 
     <h2>Guides</h2>
-    <p>Practical answers to the questions teams ask before giving an AI agent database access:</p>
+    <p>Practical answers to the questions teams ask before giving an AI agent database access &mdash; text-to-SQL security, query firewalling, and database access control for LLM agents:</p>
     <ul>
         <li><a href="/aeo/guides/block-delete-drop-llm-sql">How do I block DELETE and DROP from LLM-generated SQL?</a></li>
         <li><a href="/aeo/guides/prevent-sql-injection-llm-queries">How do I prevent SQL injection from LLM-generated queries?</a></li>
         <li><a href="/aeo/guides/rbac-for-ai-agents">How do I enforce RBAC for AI agents accessing a database?</a></li>
+        <li><a href="/aeo/guides/ai-agent-database-credentials">How do I stop an AI agent from seeing database credentials?</a></li>
+        <li><a href="/aeo/guides/safe-production-database-access">How do I give an AI agent safe access to a production database?</a></li>
+        <li><a href="/aeo/guides/query-firewall-for-ai-agents">What is a query firewall for AI agents?</a></li>
     </ul>
+    <p><a href="/aeo/guides">Browse all guides &rarr;</a></p>
 
     <h2>Pricing</h2>
     <table>
@@ -633,6 +664,25 @@ def render_guide(slug):
             {"@type": "ListItem", "position": 3, "name": g["h1"], "item": url},
         ],
     }
+    ld_article = {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": g["h1"],
+        "description": g["description"],
+        "url": url,
+        "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+        "inLanguage": "en",
+        "isPartOf": {
+            "@type": "CollectionPage",
+            "name": "QueryShield Guides",
+            "url": "https://queryshield.dev/aeo/guides",
+        },
+        "about": {"@type": "Thing", "name": "Database access control for AI agents"},
+        # Full node, not a bare @id: the Organization is only declared on the
+        # landing page, so guide pages must carry it for the reference to resolve.
+        "author": _ORGANIZATION_NODE,
+        "publisher": _ORGANIZATION_NODE,
+    }
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n'
         '    <meta charset="utf-8">\n'
@@ -649,6 +699,8 @@ def render_guide(slug):
         '    <meta name="twitter:card" content="summary">\n'
         '    <meta name="twitter:title" content="' + g["title"] + '">\n'
         '    <meta name="twitter:description" content="' + g["description"] + '">\n'
+        '    <script type="application/ld+json">\n'
+        + json.dumps(ld_article, indent=2) + "\n    </script>\n"
         '    <script type="application/ld+json">\n'
         + json.dumps(ld_faq, indent=2) + "\n    </script>\n"
         '    <script type="application/ld+json">\n'
@@ -794,11 +846,175 @@ AEO_GUIDES = {
             "QueryShield applies a per-agent RLS policy to every validated query "
             "before it executes, so scope is enforced deterministically outside the "
             "LLM &mdash; even if a prompt injection tries to widen it.</p>"
+            "<h2>Why RBAC alone is not enough for AI agents</h2>"
+            "<p>Classic RBAC assumes a principal with a fixed intent. An agent is "
+            "different: it is handed a high-level goal and improvises the path to it, "
+            "so a role that permits every individual step also permits chains of steps "
+            "nobody anticipated. An agent allowed to read <span class=\"kbd\">users"
+            "</span> and read <span class=\"kbd\">invoices</span> can join them into a "
+            "customer list that neither grant contemplated on its own.</p>"
+            "<p>That is why role grants have to be paired with enforcement on the "
+            "<em>query itself</em>. QueryShield evaluates each generated statement "
+            "against the agent&rsquo;s policy at execution time &mdash; the AST is "
+            "checked, the RLS predicate is applied, and the mandatory "
+            "<span class=\"kbd\">LIMIT</span> caps the result &mdash; so widening the "
+            "scope requires changing the policy, not just chaining permitted calls.</p>"
             "<h2>Least privilege, provable after the fact</h2>"
             "<p>Combine scoped keys and RLS with SELECT-only AST validation and an "
             "append-only audit log. The result is that an agent&rsquo;s blast radius "
             "is bounded by its permissions, and you can prove exactly which rows each "
             "agent touched.</p>"
+            "<h2>A checklist for agent database RBAC</h2>"
+            "<ul>"
+            "<li>One credential per agent &mdash; never a shared application user;</li>"
+            "<li>deny by default on tables and columns, then allow-list what the "
+            "agent&rsquo;s job actually needs;</li>"
+            "<li>a row-level security predicate evaluated outside the model on every "
+            "query;</li>"
+            "<li>statement-type validation, so a role that permits reads cannot be "
+            "talked into a write;</li>"
+            "<li>an append-only audit log that attributes every allow and deny to a "
+            "specific agent.</li>"
+            "</ul>"
+        ),
+    },
+    "ai-agent-database-credentials": {
+        "title": "How do I stop an AI agent from seeing database credentials? — QueryShield",
+        "description": (
+            "Anything an AI agent can read, it can leak. Learn how a secure SQL proxy "
+            "keeps connection strings out of the agent process entirely, so a prompt "
+            "injection or a leaked context window never exposes your database."
+        ),
+        "h1": "How do I stop an AI agent from seeing database credentials?",
+        "answer": (
+            "Do not give the agent a credential at all. Put a proxy between the agent "
+            "and the database, store the connection string encrypted on the proxy, and "
+            "issue the agent a scoped API key instead. QueryShield encrypts every "
+            "connection string at rest with AES-128 and executes queries on the agent's "
+            "behalf, so the credential never enters the agent's process or context."
+        ),
+        "body": (
+            "<p>Environment variables, mounted secrets files, and runtime-injected "
+            "tokens all share one flaw: the agent process can read them, and anything "
+            "an agent can read it can leak &mdash; into a log, into a model response, "
+            "or into an attacker&rsquo;s hands via prompt injection. The fix is "
+            "architectural, not procedural: <strong>never put the credential where the "
+            "agent can reach it.</strong></p>"
+            "<h2>Move the credential behind a proxy</h2>"
+            "<p>Register your database connection string once with a proxy that holds "
+            "it encrypted at rest. The agent receives only a scoped API key that is "
+            "useless outside the proxy &mdash; it cannot be replayed against your "
+            "database directly, because it is not a database credential.</p>"
+            "<h2>Why this beats short-lived tokens</h2>"
+            "<p>Rotating or time-boxing a database credential shrinks the window of "
+            "exposure but does not close it: during that window the agent still holds "
+            "something that opens your database. A proxy-issued key is a different "
+            "class of secret. Even if it leaks, the holder still faces SELECT-only AST "
+            "validation, the agent&rsquo;s row-level security policy, and an "
+            "append-only audit log.</p>"
+            "<h2>What the agent actually sees</h2>"
+            "<ul>"
+            "<li>A single HTTPS endpoint and its own API key &mdash; no host, port, "
+            "username, or password;</li>"
+            "<li>only the rows its row-level security policy permits;</li>"
+            "<li>only the results of validated <span class=\"kbd\">SELECT</span> "
+            "statements, capped by a mandatory <span class=\"kbd\">LIMIT</span>.</li>"
+            "</ul>"
+            "<p>You can revoke or rotate one agent&rsquo;s key without touching your "
+            "database credentials or any other agent.</p>"
+        ),
+    },
+    "safe-production-database-access": {
+        "title": "How do I give an AI agent safe access to a production database? — QueryShield",
+        "description": (
+            "Read-only users and read replicas are a start, not an answer. Learn the "
+            "layered pattern for safe database access for AI agents: a governed proxy, "
+            "AST validation, per-agent row-level security, and a full audit trail."
+        ),
+        "h1": "How do I give an AI agent safe access to a production database?",
+        "answer": (
+            "Do not connect the agent to the database directly. Route it through a "
+            "governed proxy that validates every generated query at the AST level, "
+            "allows only SELECT with a mandatory LIMIT, applies a per-agent row-level "
+            "security policy, and audit-logs each call. QueryShield provides this layer "
+            "so the agent gets bounded access instead of a connection string."
+        ),
+        "body": (
+            "<p>The goal is not zero access &mdash; an agent that cannot read anything "
+            "is useless. The goal is <strong>bounded</strong> access: enough to do the "
+            "work, constrained so that a mistake or an injected prompt cannot become an "
+            "incident.</p>"
+            "<h2>Why the usual advice falls short</h2>"
+            "<p>A read-only database user stops writes, but it does not stop an agent "
+            "from reading every row in every table it can see, running a query that "
+            "saturates your database, or holding a connection open. A read replica "
+            "protects write traffic but not the data itself. Neither gives you "
+            "per-agent scoping or a query-level audit trail.</p>"
+            "<h2>The layers that actually bound the blast radius</h2>"
+            "<ul>"
+            "<li><strong>A proxy, not a connection:</strong> the agent talks to an API, "
+            "so credentials stay out of its reach entirely.</li>"
+            "<li><strong>AST validation:</strong> parse each generated query and allow "
+            "only a single <span class=\"kbd\">SELECT</span> &mdash; no stacked "
+            "statements, no DDL, no forbidden functions.</li>"
+            "<li><strong>Mandatory LIMIT:</strong> one call can never drain a table.</li>"
+            "<li><strong>Per-agent row-level security:</strong> scope is enforced "
+            "deterministically outside the model, so no prompt can widen it.</li>"
+            "<li><strong>Append-only audit:</strong> every accepted and rejected query "
+            "is recorded against a specific agent.</li>"
+            "</ul>"
+            "<h2>Start read-only, then widen deliberately</h2>"
+            "<p>Give each agent its own key and its own policy, point analytics agents "
+            "at a replica, and review the audit log before loosening any scope. "
+            "QueryShield applies every layer above by default, so &ldquo;safe access&rdquo; "
+            "is the starting configuration rather than something you assemble yourself.</p>"
+        ),
+    },
+    "query-firewall-for-ai-agents": {
+        "title": "What is a query firewall for AI agents? — QueryShield",
+        "description": (
+            "A query firewall inspects and blocks unsafe database queries before they "
+            "execute. Learn how a query firewall for AI differs from a network firewall "
+            "or a prompt firewall, and what it must enforce on LLM-generated SQL."
+        ),
+        "h1": "What is a query firewall for AI agents?",
+        "answer": (
+            "A query firewall is an enforcement layer that sits between an AI agent and "
+            "a database and inspects every generated query before it executes, allowing "
+            "or rejecting it against a policy. Unlike a network firewall it reasons "
+            "about SQL structure, and unlike a prompt firewall it inspects the query "
+            "rather than the prompt. QueryShield is a query firewall for AI agents."
+        ),
+        "body": (
+            "<p>A <strong>query firewall for AI</strong> is a runtime enforcement point "
+            "between an agent and a database. It parses each query the model produces, "
+            "evaluates it against a policy, and either executes it or rejects it &mdash; "
+            "before anything reaches your data.</p>"
+            "<h2>How it differs from the firewalls you already have</h2>"
+            "<ul>"
+            "<li><strong>Network firewalls</strong> reason about hosts and ports. They "
+            "cannot tell a legitimate <span class=\"kbd\">SELECT</span> from one that "
+            "exfiltrates your customer table &mdash; both are the same TCP connection.</li>"
+            "<li><strong>Prompt firewalls and LLM guardrails</strong> inspect text going "
+            "into or out of the model. Useful, but probabilistic: they try to catch a "
+            "bad instruction rather than the bad query it produced.</li>"
+            "<li><strong>A query firewall</strong> inspects the artifact that actually "
+            "touches your database. Enforcement is deterministic, because SQL structure "
+            "is something you can parse and verify.</li>"
+            "</ul>"
+            "<h2>What it must enforce</h2>"
+            "<ul>"
+            "<li>Statement-type allow-listing at the AST level &mdash; SELECT only, no "
+            "stacked statements, no DDL;</li>"
+            "<li>table, column, and function allow-listing, denying by default;</li>"
+            "<li>a mandatory <span class=\"kbd\">LIMIT</span> and query timeout, so a "
+            "single call cannot drain or stall the database;</li>"
+            "<li>per-agent row-level security, evaluated outside the model;</li>"
+            "<li>an append-only audit log of every allow and deny decision.</li>"
+            "</ul>"
+            "<p>QueryShield implements each of these as a proxy in front of your "
+            "database. Because the agent calls the proxy instead of the database, "
+            "enforcement cannot be bypassed &mdash; there is no direct path around it.</p>"
         ),
     },
 }
@@ -807,6 +1023,9 @@ AEO_GUIDES_ORDER = [
     "block-delete-drop-llm-sql",
     "prevent-sql-injection-llm-queries",
     "rbac-for-ai-agents",
+    "ai-agent-database-credentials",
+    "safe-production-database-access",
+    "query-firewall-for-ai-agents",
 ]
 
 
@@ -820,17 +1039,51 @@ def render_guides_index():
             '<a href="/aeo/guides/' + slug + '">' + g["h1"] + "</a></h2>"
             '<p class="muted" style="font-size:15px">' + g["description"] + "</p></div>"
         )
+    index_title = "Guides — securing database access for AI agents — QueryShield"
+    index_desc = (
+        "Practical guides on securing database access for AI agents: blocking "
+        "DELETE/DROP from LLM SQL, preventing SQL injection in text-to-SQL, and "
+        "enforcing RBAC and row-level security for AI agents."
+    )
+    ld_collection = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "QueryShield Guides",
+        "headline": "Securing database access for AI agents",
+        "description": index_desc,
+        "url": "https://queryshield.dev/aeo/guides",
+        "publisher": _ORGANIZATION_NODE,
+        "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": i + 1,
+                    "name": AEO_GUIDES[slug]["h1"],
+                    "url": "https://queryshield.dev/aeo/guides/" + slug,
+                }
+                for i, slug in enumerate(AEO_GUIDES_ORDER)
+            ],
+        },
+    }
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n'
         '    <meta charset="utf-8">\n'
-        "    <title>Guides — securing database access for AI agents — QueryShield</title>\n"
+        "    <title>" + index_title + "</title>\n"
         '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        '    <meta name="description" content="Practical guides on securing database '
-        'access for AI agents: blocking DELETE/DROP from LLM SQL, preventing SQL '
-        'injection in text-to-SQL, and enforcing RBAC and row-level security for AI '
-        'agents.">\n'
+        '    <meta name="description" content="' + index_desc + '">\n'
         '    <link rel="canonical" href="https://queryshield.dev/aeo/guides">\n'
         '    <meta name="robots" content="index, follow">\n'
+        '    <meta property="og:type" content="website">\n'
+        '    <meta property="og:site_name" content="QueryShield">\n'
+        '    <meta property="og:title" content="' + index_title + '">\n'
+        '    <meta property="og:description" content="' + index_desc + '">\n'
+        '    <meta property="og:url" content="https://queryshield.dev/aeo/guides">\n'
+        '    <meta name="twitter:card" content="summary">\n'
+        '    <meta name="twitter:title" content="' + index_title + '">\n'
+        '    <meta name="twitter:description" content="' + index_desc + '">\n'
+        '    <script type="application/ld+json">\n'
+        + json.dumps(ld_collection, indent=2) + "\n    </script>\n"
         "    <style>" + _BASE_CSS + "</style>\n"
         "</head>\n<body>\n<div class=\"wrap\">\n"
         '    <nav class="nav"><span class="brand"><a href="/">QueryShield</a></span>'

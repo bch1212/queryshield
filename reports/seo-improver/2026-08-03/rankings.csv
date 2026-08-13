@@ -1,0 +1,17 @@
+keyword,location,device,position,previous_position,delta,ranking_url,status
+secure SQL proxy for AI agents,US,desktop,1,1,0,https://queryshield.dev/,flat
+how to block DELETE and DROP from LLM generated SQL,US,desktop,1,NT,NT,https://queryshield.dev/aeo/guides/block-delete-drop-llm-sql,new
+prevent SQL injection from LLM generated queries,US,desktop,2,NT,NT,https://queryshield.dev/aeo/guides/prevent-sql-injection-llm-queries,new
+QueryShield,US,desktop,5,5,0,https://queryshield.dev/,flat
+RBAC for AI agents accessing a database,US,desktop,6,NT,NT,https://queryshield.dev/aeo/guides/rbac-for-ai-agents,new
+database access control for LLM agents,US,desktop,NR,NR,0,,flat
+read only SQL proxy AI,US,desktop,NR,NR,0,,flat
+protect database from AI agents,US,desktop,NR,NR,0,,flat
+query firewall for AI,US,desktop,NR,NR,0,,flat
+safe database access for AI agents,US,desktop,NR,NR,0,,flat
+SQL guardrails for LLM,US,desktop,NR,NR,0,,flat
+text to SQL security,US,desktop,NR,NR,0,,flat
+AI agent database permissions,US,desktop,NR,NR,0,,flat
+how to give an AI agent safe access to a production database,US,desktop,NR,NT,NT,,new-tracked
+what is a query firewall for AI agents,US,desktop,NR,NT,NT,,new-tracked
+how do I stop an AI agent from seeing database credentials,US,desktop,NR,NT,NT,,new-tracked
