@@ -112,6 +112,14 @@ LANDING_HTML = (
       "mainEntity": [
         {
           "@type": "Question",
+          "name": "What is a secure SQL proxy for AI agents?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A secure SQL proxy for AI agents is a governed layer an agent queries instead of the database. It holds the encrypted connection string, validates every query structurally before it runs (a single SELECT with a LIMIT), scopes it to the agent's schema, table, and row policy, and records the result. QueryShield is a secure SQL proxy for AI agents."
+          }
+        },
+        {
+          "@type": "Question",
           "name": "How does QueryShield protect a database from AI agents?",
           "acceptedAnswer": {
             "@type": "Answer",
@@ -157,8 +165,8 @@ LANDING_HTML = (
     </nav>
 
     <div class="hero">
-        <h1>The security layer your AI agent stack is missing.</h1>
-        <p class="tag">A secure proxy between your agents and your databases. Send natural language; get safe SQL, per-agent row-level security, and full audit. Agents never see connection strings.</p>
+        <h1>Secure SQL proxy for AI agents</h1>
+        <p class="tag">The security layer your AI agent stack is missing: a secure proxy between your agents and your databases. Send natural language; get safe SQL, per-agent row-level security, and full audit. Agents never see connection strings.</p>
         <p class="tag">QueryShield is a query firewall for AI: it gives you database access control for LLM agents without wiring text-to-SQL security into every service yourself.</p>
         <p>
             <span class="pill">SELECT-only AST validator</span>
@@ -179,6 +187,16 @@ LANDING_HTML = (
         </form>
         <p class="muted" style="margin-top: 16px;">Free tier: 3 databases · 1M queries/month · no credit card.</p>
     </div>
+
+    <h2>What is a secure SQL proxy for AI agents?</h2>
+    <p>It is a governed layer that an AI agent queries <em>instead of</em> your database. The agent sends a question or a SQL statement to an API; the proxy holds the encrypted connection string, checks every query structurally before it runs, scopes it to what that agent is allowed to see, and records the result. A connection pooler or query router forwards SQL from applications you already trust. A secure SQL proxy for AI treats every query as untrusted, because a model wrote it.</p>
+    <ul>
+        <li>Read-only by construction: a single <span class="kbd">SELECT</span> with a <span class="kbd">LIMIT</span>, validated at the AST level;</li>
+        <li>no database credentials in the agent's process, prompt, or context window;</li>
+        <li>per-agent schema, table, and row policies;</li>
+        <li>an audit trail tied to each agent.</li>
+    </ul>
+    <p>Go deeper: <a href="/aeo/guides/read-only-sql-proxy-for-ai-agents">What is a read-only SQL proxy for AI agents?</a></p>
 
     <h2>How it works</h2>
     <ol>
@@ -209,6 +227,7 @@ LANDING_HTML = (
         <li><a href="/aeo/guides/ai-agent-database-credentials">How do I stop an AI agent from seeing database credentials?</a></li>
         <li><a href="/aeo/guides/safe-production-database-access">How do I give an AI agent safe access to a production database?</a></li>
         <li><a href="/aeo/guides/query-firewall-for-ai-agents">What is a query firewall for AI agents?</a></li>
+        <li><a href="/aeo/guides/read-only-sql-proxy-for-ai-agents">What is a read-only SQL proxy for AI agents?</a></li>
     </ul>
     <p><a href="/aeo/guides">Browse all guides &rarr;</a></p>
 
@@ -758,7 +777,9 @@ AEO_GUIDES = {
             "<span class=\"kbd\">ALTER</span>, or <span class=\"kbd\">TRUNCATE</span>);</li>"
             "<li>there are no stacked statements (no <span class=\"kbd\">;</span> "
             "chaining a second command);</li>"
-            "<li>no forbidden functions or system tables are referenced;</li>"
+            "<li>no forbidden built-in functions are called (such as "
+            "<span class=\"kbd\">pg_sleep</span>, <span class=\"kbd\">pg_read_file</span>, "
+            "<span class=\"kbd\">xp_cmdshell</span>, or <span class=\"kbd\">load_file</span>);</li>"
             "<li>a <span class=\"kbd\">LIMIT</span> is present, capping how much data "
             "any single call can return.</li>"
             "</ul>"
@@ -773,16 +794,18 @@ AEO_GUIDES = {
         "title": "How do I prevent SQL injection from LLM-generated queries? — QueryShield",
         "description": (
             "Text-to-SQL security is more than escaping strings. Learn how AST "
-            "validation, allow-listing, and per-agent guardrails stop SQL injection "
-            "and prompt-injection attacks in LLM-generated SQL."
+            "validation, function deny-listing, and per-agent guardrails stop SQL "
+            "injection, time-based pg_sleep attacks, and prompt-injection attacks in "
+            "LLM-generated SQL."
         ),
         "h1": "How do I prevent SQL injection from LLM-generated queries?",
         "answer": (
             "Do not trust the LLM's output as safe SQL. Parse every generated query, "
-            "allow only SELECT statements with no stacked commands or forbidden "
-            "functions, enforce a mandatory LIMIT, and apply per-agent row-level "
-            "security. QueryShield performs this validation on every query so "
-            "injected or prompt-manipulated SQL is rejected before execution."
+            "allow only SELECT statements with no stacked commands, reject dangerous "
+            "functions such as pg_sleep and SLEEP, enforce a mandatory LIMIT, and "
+            "apply per-agent row-level security. QueryShield performs this validation "
+            "on every query so injected or prompt-manipulated SQL is rejected before "
+            "execution."
         ),
         "body": (
             "<p><strong>Text-to-SQL security</strong> is a distinct problem from "
@@ -801,13 +824,45 @@ AEO_GUIDES = {
             "the AST level.</li>"
             "<li><strong>No stacked statements:</strong> a single query per call, so "
             "<span class=\"kbd\">SELECT 1; DROP TABLE users</span> can never run.</li>"
-            "<li><strong>Function &amp; table allow-listing:</strong> block system "
-            "catalogs and dangerous functions the agent has no business calling.</li>"
+            "<li><strong>Function deny-listing:</strong> reject dangerous built-ins "
+            "such as <span class=\"kbd\">pg_sleep</span>, <span class=\"kbd\">pg_read_file</span>, "
+            "<span class=\"kbd\">dblink</span>, <span class=\"kbd\">xp_cmdshell</span>, and "
+            "<span class=\"kbd\">load_file</span>.</li>"
+            "<li><strong>Per-agent table allow-lists:</strong> restrict each agent to "
+            "the schemas and tables its policy names.</li>"
             "<li><strong>Mandatory LIMIT:</strong> cap result size so a single call "
-            "cannot exfiltrate an entire table.</li>"
+            "cannot exfiltrate an entire table; the proxy applies its own hard row cap "
+            "on top.</li>"
             "<li><strong>Per-agent row-level security:</strong> scope every query to "
             "the rows that agent is allowed to see.</li>"
             "</ul>"
+            "<h2>How prompt injection becomes SQL injection</h2>"
+            "<p>In classic SQL injection an attacker controls one parameter inside a "
+            "query a developer wrote. With an LLM, the attacker only needs to get text "
+            "into the model&rsquo;s context &mdash; a user message, a support ticket, a "
+            "row the agent read earlier &mdash; and the model writes the malicious query "
+            "itself. That chain has three steps:</p>"
+            "<ol>"
+            "<li>untrusted text reaches the prompt;</li>"
+            "<li>the model turns it into syntactically valid SQL;</li>"
+            "<li>the SQL runs with whatever access the agent holds.</li>"
+            "</ol>"
+            "<p>You cannot reliably break step 1 or step 2, because both are "
+            "probabilistic. Step 3 is where enforcement is deterministic: the query is a "
+            "concrete artifact you can parse and reject.</p>"
+            "<h2>Time-based SQL injection through prompt injection</h2>"
+            "<p>A blind attacker who cannot see query results can still extract data "
+            "one bit at a time. The injected instruction steers the model into a query "
+            "like <span class=\"kbd\">SELECT CASE WHEN (condition) THEN pg_sleep(5) END</span>: "
+            "if the response is slow, the condition was true. Repeat that across "
+            "enough conditions and the attacker reconstructs values without a single "
+            "row being returned.</p>"
+            "<p>A read-only role does not stop this, because sleep functions are "
+            "readable by default. QueryShield rejects <span class=\"kbd\">pg_sleep</span>, "
+            "MySQL&rsquo;s <span class=\"kbd\">SLEEP</span> and "
+            "<span class=\"kbd\">BENCHMARK</span>, and the other deny-listed functions "
+            "anywhere in the AST &mdash; including inside subqueries and CTEs &mdash; "
+            "so the timing channel never opens.</p>"
             "<p>QueryShield applies all of these as a proxy in front of your "
             "database, and audit-logs every decision. Because the agent only ever "
             "talks to the proxy, it never sees connection strings or credentials to "
@@ -1006,15 +1061,89 @@ AEO_GUIDES = {
             "<ul>"
             "<li>Statement-type allow-listing at the AST level &mdash; SELECT only, no "
             "stacked statements, no DDL;</li>"
-            "<li>table, column, and function allow-listing, denying by default;</li>"
-            "<li>a mandatory <span class=\"kbd\">LIMIT</span> and query timeout, so a "
-            "single call cannot drain or stall the database;</li>"
+            "<li>a deny-list of dangerous built-in functions, plus per-agent schema "
+            "and table allow-lists;</li>"
+            "<li>a mandatory <span class=\"kbd\">LIMIT</span> and a hard row cap "
+            "enforced by the proxy, so a single call cannot drain a table;</li>"
             "<li>per-agent row-level security, evaluated outside the model;</li>"
             "<li>an append-only audit log of every allow and deny decision.</li>"
             "</ul>"
             "<p>QueryShield implements each of these as a proxy in front of your "
             "database. Because the agent calls the proxy instead of the database, "
             "enforcement cannot be bypassed &mdash; there is no direct path around it.</p>"
+        ),
+    },
+    "read-only-sql-proxy-for-ai-agents": {
+        "title": "What is a read-only SQL proxy for AI agents? — QueryShield",
+        "description": (
+            "A read-only database user stops writes; a read-only SQL proxy also bounds "
+            "what an AI agent can read. Learn how SELECT-only AST validation, row caps, "
+            "and per-agent policies give LLM agents safe read-only database access, "
+            "including over MCP."
+        ),
+        "h1": "What is a read-only SQL proxy for AI agents?",
+        "answer": (
+            "A read-only SQL proxy sits between an AI agent and a database and executes "
+            "only queries it has verified cannot write. QueryShield parses every query, "
+            "allows a single SELECT with a mandatory LIMIT, rejects DDL, DML, stacked "
+            "statements, and dangerous functions, applies the agent's schema, table, "
+            "and row policy, and holds the database credential so the agent never sees it."
+        ),
+        "body": (
+            "<p>Traditional SQL proxies &mdash; connection poolers and query routers "
+            "&mdash; forward traffic from applications you wrote and trust. An AI agent "
+            "is a different kind of client: it writes its own SQL from natural language, "
+            "and that SQL can be steered by whatever text lands in its context. A "
+            "<strong>read-only SQL proxy for AI</strong> is built for that client. Its job "
+            "is not routing traffic; it is deciding whether each query may run at all.</p>"
+            "<h2>Read-only user vs. read-only proxy</h2>"
+            "<p>A read-only database role is the right first layer, and you should keep "
+            "it. But it enforces one property &mdash; no writes &mdash; and it has to be "
+            "configured correctly in every database you connect. On its own it does not "
+            "stop an agent from:</p>"
+            "<ul>"
+            "<li>reading every row of every table the role can see;</li>"
+            "<li>running an unbounded <span class=\"kbd\">SELECT</span> that returns "
+            "millions of rows;</li>"
+            "<li>calling <span class=\"kbd\">pg_sleep</span> or similar functions that "
+            "any role can execute, opening a timing side channel;</li>"
+            "<li>holding the connection string itself, where a prompt injection can "
+            "leak it.</li>"
+            "</ul>"
+            "<h2>What a read-only SQL proxy enforces</h2>"
+            "<ul>"
+            "<li><strong>Structural read-only checks:</strong> each query is parsed into "
+            "an AST. The root must be a <span class=\"kbd\">SELECT</span> (or a UNION or "
+            "CTE of SELECTs), and no INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, "
+            "TRUNCATE, or MERGE may appear anywhere inside it, including subqueries.</li>"
+            "<li><strong>One statement per call:</strong> anything chained after a "
+            "<span class=\"kbd\">;</span> is rejected, and a query the parser cannot "
+            "resolve is rejected rather than guessed at.</li>"
+            "<li><strong>Function deny-listing:</strong> built-ins such as "
+            "<span class=\"kbd\">pg_sleep</span>, <span class=\"kbd\">pg_read_file</span>, "
+            "<span class=\"kbd\">dblink</span>, <span class=\"kbd\">xp_cmdshell</span>, and "
+            "<span class=\"kbd\">load_file</span> are refused.</li>"
+            "<li><strong>Bounded results:</strong> a <span class=\"kbd\">LIMIT</span> is "
+            "required in the SQL, and the proxy applies its own hard row cap on top.</li>"
+            "<li><strong>Per-agent scope:</strong> an agent&rsquo;s policy can restrict it "
+            "to named schemas and tables and inject a row filter, so read-only also means "
+            "reading only what that agent should.</li>"
+            "<li><strong>Audit:</strong> every allowed and rejected query is written to an "
+            "append-only log against the agent that sent it.</li>"
+            "</ul>"
+            "<h2>Read-only database access over MCP</h2>"
+            "<p>Model Context Protocol clients such as Claude Desktop and Cursor make it "
+            "easy to hand an agent a database tool &mdash; and just as easy to hand it a "
+            "raw connection string. QueryShield ships as an MCP server "
+            "(<span class=\"kbd\">pip install queryshield-mcp</span>) that calls the proxy "
+            "with a scoped API key, so the MCP client gets read-only, policy-bound "
+            "database access and never holds the credential.</p>"
+            "<h2>When a read-only user is enough</h2>"
+            "<p>For a single trusted analyst agent on a non-sensitive replica, a "
+            "read-only role with a statement timeout may be all you need. Reach for a "
+            "read-only SQL proxy when agents take untrusted input, when several agents "
+            "need different scopes, or when you must prove after the fact what each "
+            "agent read.</p>"
         ),
     },
 }
@@ -1026,6 +1155,7 @@ AEO_GUIDES_ORDER = [
     "ai-agent-database-credentials",
     "safe-production-database-access",
     "query-firewall-for-ai-agents",
+    "read-only-sql-proxy-for-ai-agents",
 ]
 
 
@@ -1042,8 +1172,8 @@ def render_guides_index():
     index_title = "Guides — securing database access for AI agents — QueryShield"
     index_desc = (
         "Practical guides on securing database access for AI agents: blocking "
-        "DELETE/DROP from LLM SQL, preventing SQL injection in text-to-SQL, and "
-        "enforcing RBAC and row-level security for AI agents."
+        "DELETE/DROP from LLM SQL, preventing SQL injection in text-to-SQL, "
+        "enforcing RBAC and row-level security, and read-only SQL proxies for AI."
     )
     ld_collection = {
         "@context": "https://schema.org",

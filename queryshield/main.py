@@ -493,6 +493,13 @@ def aeo_guide(slug: str) -> Response:
     return HTMLResponse(html)
 
 
+# Legacy URL from an earlier site version: still in search indexes but 404s.
+# Permanently redirect to the guide that now covers time-based SQL injection.
+@app.get("/aeo/attacks/time-based-sql-injection-prompt", include_in_schema=False)
+def legacy_time_based_sqli() -> RedirectResponse:
+    return RedirectResponse("/aeo/guides/prevent-sql-injection-llm-queries", status_code=301)
+
+
 @app.post("/signup", response_class=HTMLResponse)
 async def signup_handler(request: Request, email: str = Form(...), workspace: str = Form("")):
     ip = client_ip(request)
