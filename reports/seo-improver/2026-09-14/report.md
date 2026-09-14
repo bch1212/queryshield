@@ -89,25 +89,28 @@ All edits are marketing HTML, guide content, and one additive redirect route. **
 
 **Commit:** `eff04d8`, pushed to `origin/main` (`304ecf9..eff04d8`), branch in sync with origin.
 
-## ⚠️ DEPLOY PENDING
+## ✅ DEPLOYED — 2026-09-14
 
-**Changes are committed and pushed to GitHub but are NOT live on queryshield.dev.** Production still serves `304ecf9`: 9 sitemap URLs, the old H1, the legacy URL still 404s, and the inaccurate guide claims are still published.
+**Update to this report.** It was originally written with a DEPLOY PENDING section. When Brett authorized the deploy in-session, it turned out to be **already live**. Railway's `queryshield-api` service (`300a2546-…`) auto-deployed from the GitHub push: its latest deployment is commit `6893157` (this report's commit, which includes `eff04d8`), status **SUCCESS**, created 2026-09-14T21:55Z, minutes after the push. No `railway up` was needed or run.
 
-Manual deploy, from the repo root, with a project-scoped Railway token or after `railway link` to project `73846f59-a7e7-4e98-b6c0-02c907252a2c`:
+**This changes the deploy model.** The scheduled task assumes commit-and-flag (push, then a human runs `railway up`), but **pushing to `main` deploys to production.** Future runs should treat `git push` as the deploy step.
 
-```bash
-cd /Users/bretthalverson/Projects/_mcp_email_work/queryshield
-railway up --service queryshield-api --ci
-```
+**Why Brett's `railway up` said "service not found":** the service name `queryshield-api` is correct. It exists in project `queryshield` / env `production`, and the repo's CLI link resolves to it. The most likely cause is running the command outside the linked repo directory, or with a `RAILWAY_TOKEN` env var scoped to a different project. Either way, no manual deploy is required.
 
-After deploying, verify:
-- `curl -sI https://queryshield.dev/aeo/attacks/time-based-sql-injection-prompt` → `301`
-- `https://queryshield.dev/aeo/guides/read-only-sql-proxy-for-ai-agents` → `200`
-- `curl -s https://queryshield.dev/sitemap.xml | grep -c '<loc>'` → `10`
+**Live verification against queryshield.dev — all passed:**
 
-Then resubmit the sitemap in GSC.
+| Check | Result |
+|---|---|
+| `/aeo/attacks/time-based-sql-injection-prompt` | **301** → `/aeo/guides/prevent-sql-injection-llm-queries` (QS-SEO-020) |
+| SQLi guide "Time-based SQL injection" section | present (QS-SEO-021) |
+| `/aeo/guides/read-only-sql-proxy-for-ai-agents` | **200** on apex and www (QS-SEO-022) |
+| `sitemap.xml` `<loc>` count | **10** (was 9) |
+| Landing `<h1>` | `Secure SQL proxy for AI agents` (QS-SEO-023) |
+| Landing head-term section + FAQ entry | present (QS-SEO-023) |
+| Query-firewall guide "query timeout" claim | **gone**; "hard row cap" present (QS-SEO-024) |
+| `/health` | `{"status":"ok"}` |
 
-**QS-SEO-024 is the most time-sensitive part of this deploy.** Until it ships, the query-firewall guide tells readers QueryShield enforces column allow-lists and query timeouts, and it doesn't.
+**Remaining human step:** resubmit the sitemap in GSC so the new guide and the redirect get picked up, and use that visit for the URL Inspection check on the three 08-13 guides (backlog item #1).
 
 ## Improvements NOT Made (backlog)
 
