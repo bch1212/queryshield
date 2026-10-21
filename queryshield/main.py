@@ -39,6 +39,7 @@ from queryshield.billing import (
     handle_webhook,
     increment_quota,
 )
+from queryshield.credential_api import build_credential_router
 from queryshield.config import get_settings
 from queryshield.models import (
     Agent,
@@ -125,9 +126,9 @@ app = FastAPI(
     title="QueryShield",
     version=__version__,
     description=(
-        "Secure SQL proxy between AI agents and enterprise databases. "
-        "Validate intent, translate NL → SQL, enforce row-level security per "
-        "agent identity, and audit-log every query."
+        "QueryShield agent security suite. Secure SQL proxy plus a named "
+        "credential vault for AI agents. One qs_ API key, one Stripe customer. "
+        "InjectShield (https://injectshield.dev) is the free prompt-injection funnel."
     ),
     lifespan=lifespan,
 )
@@ -175,6 +176,9 @@ async def require_admin(x_admin_key: str = Header(..., alias="X-Admin-Key")) -> 
     if not _secrets.compare_digest(agent.name or "", "__admin__"):
         raise HTTPException(status_code=403, detail="admin key required for this endpoint")
     return agent
+
+
+app.include_router(build_credential_router(require_admin, require_agent))
 
 
 # --- Health ------------------------------------------------------------
@@ -321,13 +325,24 @@ async def create_tenant(request: Request, name: str):
 async def create_agent(reg: AgentRegistration, admin: Agent = Depends(require_admin)):
     if reg.tenant_id != admin.tenant_id:
         raise HTTPException(status_code=403, detail="tenant mismatch")
+    import math
+
     raw, prefix, digest = generate_api_key()
+    for label, value in (("budget_daily", reg.budget_daily), ("budget_monthly", reg.budget_monthly)):
+        if value is not None and (not math.isfinite(value) or value < 0):
+            raise HTTPException(status_code=400, detail=f"{label} must be >= 0")
+    patterns = list(reg.credential_permissions or [])
+    if any(not isinstance(p, str) or not p.strip() for p in patterns):
+        raise HTTPException(status_code=400, detail="credential_permissions must be a list of patterns")
     with SessionLocal() as session:
         agent = Agent(
             tenant_id=reg.tenant_id,
             name=reg.name,
             api_key_hash=digest,
             api_key_prefix=prefix,
+            credential_permissions=patterns,
+            budget_daily=reg.budget_daily,
+            budget_monthly=reg.budget_monthly,
         )
         session.add(agent)
         session.commit()
@@ -434,6 +449,7 @@ from queryshield.web import (
     LANDING_HTML,
     LOGIN_HTML,
     SIGNUP_RESULT_HTML,
+    SUITE_HTML,
     VERIFY_FAILED_HTML,
     render_guide,
     render_guides_index,
@@ -470,6 +486,8 @@ def sitemap_xml() -> Response:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         "  <url><loc>https://queryshield.dev/</loc>"
         "<changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        "  <url><loc>https://queryshield.dev/suite</loc>"
+        "<changefreq>monthly</changefreq><priority>0.8</priority></url>\n"
         "  <url><loc>https://queryshield.dev/aeo/guides</loc>"
         "<changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
         + guide_urls
@@ -478,6 +496,12 @@ def sitemap_xml() -> Response:
         "</urlset>\n"
     )
     return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/suite", response_class=HTMLResponse)
+def suite_page() -> str:
+    """One docs page for the suite. InjectShield stays on its own site."""
+    return SUITE_HTML
 
 
 @app.get("/aeo/guides", response_class=HTMLResponse)
@@ -631,6 +655,9 @@ async def dashboard_data(tenant_id: str = Depends(_require_session)):
                 "name": a.name,
                 "key_prefix": a.api_key_prefix,
                 "active": a.active,
+                "credential_permissions": a.credential_permissions or [],
+                "budget_daily": a.budget_daily,
+                "budget_monthly": a.budget_monthly,
                 "created_at": a.created_at.isoformat() if a.created_at else None,
             }
             for a in agents
@@ -638,7 +665,10 @@ async def dashboard_data(tenant_id: str = Depends(_require_session)):
         tier = tenant.tier or "starter"
         limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
 
+    from queryshield.credentials import list_credentials as list_named_credentials
+
     databases = list_databases(tenant_id)
+    named_credentials = list_named_credentials(tenant_id)
     logs = await _get_logs(tenant_id, limit=25)
     return {
         "tenant": {
@@ -649,9 +679,11 @@ async def dashboard_data(tenant_id: str = Depends(_require_session)):
             "queries_used": tenant.queries_used_period,
             "queries_limit": limits["queries_per_month"],
             "databases_limit": limits["databases"],
+            "credentials_limit": limits.get("credentials", 0),
         },
         "agents": agents_data,
         "databases": databases,
+        "credentials": named_credentials,
         "audit": [r.model_dump(mode="json") for r in logs],
     }
 

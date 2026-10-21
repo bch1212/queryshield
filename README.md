@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/bch1212/queryshield/actions/workflows/test.yml/badge.svg)](https://github.com/bch1212/queryshield/actions/workflows/test.yml)
 
-Secure SQL proxy between AI agents and enterprise databases.
+Agent security suite. QueryShield is the lead product: a secure SQL proxy and a named credential vault, one `qs_` API key, one Stripe customer, and this docs site.
 
 Agents call a single endpoint in plain English (or structured SQL). QueryShield:
 
@@ -16,6 +16,10 @@ Agents call a single endpoint in plain English (or structured SQL). QueryShield:
    never row contents.
 
 Agents never see connection strings.
+
+The credential vault stores other secrets (API tokens the agent is allowed to use). It is the AgentVault product, folded into this service. Permission patterns decide which names an agent can read. Database connection strings stay in a separate encrypted store and are not readable through the vault.
+
+**Free tier / funnel:** [InjectShield](https://injectshield.dev) scans untrusted text for prompt injection. It stays in its own repository ([bch1212/injectshield](https://github.com/bch1212/injectshield)) and its own API ([api.injectshield.dev](https://api.injectshield.dev)). Start there, then create one QueryShield workspace when an agent needs a database or a vault. Docs: [injectshield.dev/docs](https://injectshield.dev/docs). Suite page on this service: `/suite`.
 
 ---
 
@@ -74,6 +78,31 @@ curl -X POST localhost:8000/v1/policies \
     "allowed_tables": ["users", "orders"],
     "row_filters": { "users": "tenant_id = 42" }
   }'
+
+# 4b) Store a named credential and let one agent read it.
+#     The value is write-only on this call. Empty permissions grant nothing.
+curl -X POST localhost:8000/v1/credentials \
+  -H 'X-Admin-Key: qs_...' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "openai_key",
+    "provider": "openai",
+    "value": "YOUR_SECRET"
+  }'
+
+curl -X POST localhost:8000/v1/agents \
+  -H 'X-Admin-Key: qs_...' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "writer",
+    "tenant_id": "<tenant>",
+    "credential_permissions": ["openai_*"],
+    "budget_daily": 5
+  }'
+
+# The agent uses the same qs_ key it uses for /v1/query.
+curl -X POST localhost:8000/v1/vault/get/openai_key \
+  -H 'X-API-Key: qs_...'
 
 # 5) The agent queries.
 curl -X POST localhost:8000/v1/query \
@@ -135,7 +164,11 @@ Tools exposed:
 
 - `query_database(database_alias, question, max_rows)` — natural-language
 - `query_database_sql(database_alias, sql, max_rows)` — pre-built SELECT
+- `list_credentials()` — names this agent may read
+- `get_credential(name, cost)` — one permitted secret, same API key
 - `get_audit_log(limit)` — recent attempts for the calling agent
+
+The PyPI package `queryshield-mcp` picks up the vault tools on its next release. Until then, `python -m queryshield.mcp_server` from this repo already exposes them.
 
 ---
 
@@ -149,6 +182,8 @@ Tools exposed:
 | Agent reads tables outside its scope           | RLS schema + table whitelist               |
 | Agent reads other tenants' rows                | `row_filters` injected via AST `.where()`  |
 | Connection string leaks via stack traces       | Fernet-encrypted, never returned in any API |
+| Agent reads a secret it was not granted        | fnmatch permissions; empty list fails closed |
+| Vault audit becomes the secret                 | credential access log stores metadata only  |
 | Audit log becomes the data exfil vector        | only metadata is stored — never rows        |
 | `VAULT_KEY` rotation                           | re-encrypt rows under new key (script-driven) |
 
@@ -159,13 +194,14 @@ that lands there should ship with a test in `tests/test_safety.py`.
 
 ## Pricing
 
-| Tier        | Monthly | Databases | Queries / month | Notes                  |
-| ----------- | ------- | --------- | --------------- | ---------------------- |
-| Starter     | $500    | 3         | 1,000,000       |                        |
-| Pro         | $1,500  | 10        | 10,000,000      | audit export           |
-| Enterprise  | $3,500  | unlimited | unlimited       | SSO, SIEM webhook      |
+| Tier         | Monthly | Databases | Credentials | Queries / month | Notes                  |
+| ------------ | ------- | --------- | ----------- | --------------- | ---------------------- |
+| InjectShield | free    | —         | —           | —               | prompt-injection funnel, separate site |
+| Starter      | $500    | 3         | 25          | 1,000,000       |                        |
+| Pro          | $1,500  | 10        | 100         | 10,000,000      | audit export           |
+| Enterprise   | $3,500  | unlimited | unlimited   | unlimited       | SSO, SIEM webhook      |
 
-Targets `$32.5K MRR @ 15 customers (10 Pro + 5 Enterprise)`.
+QueryShield tiers are one Stripe customer. InjectShield sign-up stays on [injectshield.dev](https://injectshield.dev) until that billing is folded in. Targets `$32.5K MRR @ 15 customers (10 Pro + 5 Enterprise)`.
 
 ---
 
@@ -192,7 +228,7 @@ pip install pytest
 python -m pytest tests/
 ```
 
-42 tests cover:
+102 tests cover the original safety, RLS, proxy, and HTTP suites plus the credential vault (encryption, `qs_` key hashing, permission checks, budgets, tenant isolation, and the column migration for existing databases) and fail-closed `VAULT_KEY` / `SESSION_KEY` checks. The original cases:
 
 - AST safety (24 cases — direct DDL, comments, encoded keywords, multiple
   statements, forbidden functions, missing LIMIT)

@@ -18,6 +18,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     Index,
     Integer,
     LargeBinary,
@@ -43,9 +44,27 @@ class Tier(str, enum.Enum):
 
 
 TIER_LIMITS: Dict[str, Dict[str, int]] = {
-    "starter": {"databases": 3, "queries_per_month": 1_000_000, "price_cents": 50_000},
-    "pro": {"databases": 10, "queries_per_month": 10_000_000, "price_cents": 150_000},
-    "enterprise": {"databases": 10_000, "queries_per_month": 1_000_000_000, "price_cents": 350_000},
+    # ``credentials`` is the named-secret vault (the folded AgentVault feature).
+    # Database connection strings are counted under ``databases``, not here.
+    # One Stripe customer on the QueryShield prices covers both.
+    "starter": {
+        "databases": 3,
+        "queries_per_month": 1_000_000,
+        "credentials": 25,
+        "price_cents": 50_000,
+    },
+    "pro": {
+        "databases": 10,
+        "queries_per_month": 10_000_000,
+        "credentials": 100,
+        "price_cents": 150_000,
+    },
+    "enterprise": {
+        "databases": 10_000,
+        "queries_per_month": 1_000_000_000,
+        "credentials": 10_000,
+        "price_cents": 350_000,
+    },
 }
 
 
@@ -93,6 +112,11 @@ class AgentRegistration(BaseModel):
     name: str
     tenant_id: str
     tier: Tier = Tier.starter
+    # fnmatch patterns for named credentials this agent may read.
+    # Empty means no credential access (fail closed). Use ["*"] for all.
+    credential_permissions: List[str] = Field(default_factory=list)
+    budget_daily: Optional[float] = None
+    budget_monthly: Optional[float] = None
 
 
 class AgentRegistrationResult(BaseModel):
@@ -186,6 +210,10 @@ class Agent(Base):
     api_key_hash = Column(String(128), nullable=False, unique=True, index=True)
     api_key_prefix = Column(String(16), nullable=False)
     active = Column(Boolean, default=True, nullable=False)
+    # Named-credential scope. Empty list = no reads. Not a second API key.
+    credential_permissions = Column(JSON, nullable=False, default=list)
+    budget_daily = Column(Float, nullable=True)
+    budget_monthly = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
 
@@ -218,6 +246,62 @@ class RLSPolicyRow(Base):
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     __table_args__ = (Index("ix_rls_agent_db", "agent_id", "database_alias", unique=True),)
+
+
+class StoredCredential(Base):
+    """Tenant-scoped named secret. ``encrypted_value`` is a Fernet token.
+
+    This is the AgentVault credential, stored on the QueryShield tenant.
+    Database connection strings do not live here — see ``DatabaseRow``.
+    """
+
+    __tablename__ = "stored_credentials"
+
+    id = Column(String(64), primary_key=True, default=_new_id)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    provider = Column(String(100), nullable=True)
+    encrypted_value = Column(Text, nullable=False)
+    rotation_interval_hours = Column(Integer, nullable=True)
+    last_rotated = Column(DateTime(timezone=True), nullable=True)
+    details = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    __table_args__ = (Index("ix_cred_tenant_name", "tenant_id", "name", unique=True),)
+
+
+class CredentialAccessLog(Base):
+    """Append-only metadata for named-credential reads. Never the secret."""
+
+    __tablename__ = "credential_access_logs"
+
+    id = Column(String(64), primary_key=True, default=_new_id)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    agent_id = Column(String(64), nullable=False, index=True)
+    credential_id = Column(String(64), nullable=False, index=True)
+    action = Column(String(50), nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    success = Column(Boolean, default=True, nullable=False)
+    error_message = Column(String(512), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class CredentialBudgetUsage(Base):
+    """Per-agent spend against a daily or monthly cap. ``period_key`` is UTC."""
+
+    __tablename__ = "credential_budget_usage"
+
+    id = Column(String(64), primary_key=True, default=_new_id)
+    agent_id = Column(String(64), nullable=False, index=True)
+    period_key = Column(String(32), nullable=False)
+    amount_used = Column(Float, default=0.0, nullable=False)
+    limit_amount = Column(Float, nullable=False)
+
+    __table_args__ = (
+        Index("ix_budget_agent_period", "agent_id", "period_key", unique=True),
+    )
 
 
 class AuditLog(Base):
@@ -263,14 +347,30 @@ def init_db() -> None:
 def _apply_column_migrations() -> None:
     from sqlalchemy import text
 
-    # (table, column, type) — Postgres-flavored. Each statement uses
-    # ADD COLUMN IF NOT EXISTS so the boot is safe to retry.
-    migrations = [
-        ("tenants", "owner_email", "VARCHAR(320)"),
-    ]
+    # (table, column, type). Postgres uses ADD COLUMN IF NOT EXISTS.
+    # SQLite checks PRAGMA table_info and skips columns that already exist.
     dialect = ENGINE.dialect.name  # "postgresql" | "sqlite" | ...
     if dialect not in {"postgresql", "sqlite"}:
         return
+    migrations = [
+        ("tenants", "owner_email", "VARCHAR(320)"),
+    ]
+    if dialect == "postgresql":
+        migrations.extend(
+            [
+                ("agents", "credential_permissions", "JSON"),
+                ("agents", "budget_daily", "DOUBLE PRECISION"),
+                ("agents", "budget_monthly", "DOUBLE PRECISION"),
+            ]
+        )
+    else:
+        migrations.extend(
+            [
+                ("agents", "credential_permissions", "TEXT"),
+                ("agents", "budget_daily", "REAL"),
+                ("agents", "budget_monthly", "REAL"),
+            ]
+        )
     with ENGINE.begin() as conn:
         for table, column, coltype in migrations:
             if dialect == "postgresql":
