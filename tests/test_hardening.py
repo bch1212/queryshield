@@ -63,6 +63,26 @@ def test_register_db_with_private_host_returns_400(client) -> None:
 
 # --- Rate limit ---------------------------------------------------------
 
+def test_vault_requires_key(monkeypatch) -> None:
+    from queryshield.config import get_settings
+    from queryshield.vault import encrypt_connection
+
+    monkeypatch.setattr(get_settings(), "vault_key", None)
+    with pytest.raises(RuntimeError, match="VAULT_KEY is not configured"):
+        encrypt_connection({"type": "sqlite", "url": "sqlite:///x"})
+
+
+def test_session_requires_key(monkeypatch) -> None:
+    from queryshield.auth import issue_session
+    from queryshield.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "vault_key", None)
+    monkeypatch.setattr(settings, "session_key", None)
+    with pytest.raises(RuntimeError, match="SESSION_KEY or VAULT_KEY is not configured"):
+        issue_session("tenant")
+
+
 def test_token_bucket_basic() -> None:
     _BUCKETS.clear()
     for _ in range(3):

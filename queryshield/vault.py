@@ -32,11 +32,9 @@ log = logging.getLogger("queryshield.vault")
 
 def _fernet() -> Fernet:
     key = get_settings().vault_key
-    if not key:
-        # In dev, fall back to a deterministic key so local boots work.
-        # In production the startup config check refuses to start without one.
-        key = "dev-only-vault-key-do-not-use-in-prod-dev-only-vault-key="
-    return Fernet(key.encode("utf-8") if isinstance(key, str) else key)
+    if not isinstance(key, str) or not key.strip():
+        raise RuntimeError("VAULT_KEY is not configured")
+    return Fernet(key.encode("utf-8"))
 
 
 def encrypt_connection(payload: dict) -> bytes:
