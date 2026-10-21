@@ -28,12 +28,16 @@ The credential vault stores other secrets (API tokens the agent is allowed to us
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# Set ANTHROPIC_API_KEY, DATABASE_URL, VAULT_KEY (see below)
+# Set ANTHROPIC_API_KEY, DATABASE_URL, and VAULT_KEY in .env (see below).
+# Do not commit .env. QueryShield reads secrets from the environment only.
 
 python -m queryshield.start
 ```
 
-Generate a Fernet key for `VAULT_KEY` once and never lose it:
+Generate a Fernet key for `VAULT_KEY` once and never lose it. Credential
+encryption and session signing both require `VAULT_KEY` (or `SESSION_KEY`
+for cookies). If it is unset, those operations fail instead of using a
+built-in key:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -54,7 +58,7 @@ curl -X POST localhost:8000/v1/databases \
   -d '{
     "alias": "prod",
     "db_type": "postgresql",
-    "connection_string": "postgresql://reader:secret@db.acme.internal:5432/app",
+    "connection_string": "postgresql://READER:PASSWORD@db.example.internal:5432/app",
     "allowed_tables": ["users", "orders"]
   }'
 
@@ -224,7 +228,7 @@ pip install pytest
 python -m pytest tests/
 ```
 
-100 tests cover the original safety, RLS, proxy, and HTTP suites plus the credential vault (encryption, `qs_` key hashing, permission checks, budgets, tenant isolation, and the column migration for existing databases). The original cases:
+102 tests cover the original safety, RLS, proxy, and HTTP suites plus the credential vault (encryption, `qs_` key hashing, permission checks, budgets, tenant isolation, and the column migration for existing databases) and fail-closed `VAULT_KEY` / `SESSION_KEY` checks. The original cases:
 
 - AST safety (24 cases — direct DDL, comments, encoded keywords, multiple
   statements, forbidden functions, missing LIMIT)

@@ -556,7 +556,7 @@ DASHBOARD_HTML = (
                     <option value="sqlite">SQLite</option>
                 </select>
                 <label>Connection string (encrypted at rest)</label>
-                <input id="db-cs" type="text" placeholder="postgresql://reader:secret@host:5432/db">
+                <input id="db-cs" type="text" placeholder="postgresql://READER:PASSWORD@host:5432/db">
                 <p class="muted" style="margin-top: 8px;">Tip: use a <em>read-only</em> database role. QueryShield's safety check + RLS only run inside our service; defense in depth means the DB itself should refuse writes.</p>
                 <button class="btn secondary" onclick="registerDb()">Register</button>
                 <div id="db-result"></div>

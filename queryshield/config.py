@@ -1,8 +1,9 @@
 """Centralized settings — one place for env-var reads.
 
 Pattern matches the rest of Brett's agentic-build projects: a singleton
-``Settings`` instance loaded once at import, with conservative defaults so
-local development works without a .env file.
+``Settings`` instance loaded once at import, with conservative defaults for
+non-secret settings so local development works without a .env file.
+Secrets have no built-in default and must come from the environment.
 """
 from __future__ import annotations
 
@@ -29,9 +30,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///queryshield_local.db"
 
     # Vault
-    vault_key: Optional[str] = None  # Fernet key (base64) — required in prod
-    # Optional: override session-cookie HMAC key. Defaults to a derived key
-    # off VAULT_KEY if unset. Rotating SESSION_KEY logs everyone out.
+    vault_key: Optional[str] = None  # Fernet key (base64). Required to encrypt credentials.
+    # Optional: override session-cookie HMAC key. Derived from VAULT_KEY when
+    # unset. There is no built-in fallback. Rotating SESSION_KEY logs everyone out.
     session_key: Optional[str] = None
 
     # Cache

@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 # Make sure the package under test is importable
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,9 +25,10 @@ sys.path.insert(0, str(ROOT))
 # SQLAlchemy ENGINE at module import using the env-time DATABASE_URL.
 _TEST_TMP = tempfile.mkdtemp(prefix="queryshield-tests-")
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_TMP}/control.db"
-os.environ["VAULT_KEY"] = "RIaPxXZl9MNm7ESjqpsnbsiBCDkfErP6Mum0lmGD-7w="  # fixed test key
+# Fresh key per process. Never a committed shared key, and never logged.
+os.environ["VAULT_KEY"] = Fernet.generate_key().decode()
 os.environ["ENVIRONMENT"] = "test"
-os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test"
+os.environ["ANTHROPIC_API_KEY"] = "test-not-a-real-key"
 
 
 @pytest.fixture()

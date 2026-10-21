@@ -45,10 +45,12 @@ MAGIC_LINK_TTL_MIN = 30
 # --- Session cookies ---------------------------------------------------
 
 def _session_key() -> bytes:
-    """Derive a stable HMAC key. Falls back to VAULT_KEY if SESSION_KEY unset."""
+    """Derive a stable HMAC key from SESSION_KEY, or from VAULT_KEY if unset."""
     s = get_settings()
-    key = getattr(s, "session_key", None) or s.vault_key or "dev-only-fallback-session-key"
-    return hashlib.sha256(key.encode("utf-8") if isinstance(key, str) else key).digest()
+    key = s.session_key or s.vault_key
+    if not isinstance(key, str) or not key.strip():
+        raise RuntimeError("SESSION_KEY or VAULT_KEY is not configured")
+    return hashlib.sha256(key.encode("utf-8")).digest()
 
 
 def issue_session(tenant_id: str) -> str:
