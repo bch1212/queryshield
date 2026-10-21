@@ -1,14 +1,43 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
+.direnv/
+
+# Secrets and local env (keep the committed template)
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local databases and SQLite sidecars (runtime artifacts, not fixtures)
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
-.idea/
-.vscode/
+*.sqlite-journal
+*.sqlite3-journal
+
+# Packaging and editor
 *.egg-info/
 build/
 dist/
+.idea/
+.vscode/
+.DS_Store

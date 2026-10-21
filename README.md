@@ -24,12 +24,16 @@ Agents never see connection strings.
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# Set ANTHROPIC_API_KEY, DATABASE_URL, VAULT_KEY (see below)
+# Set ANTHROPIC_API_KEY, DATABASE_URL, and VAULT_KEY in .env (see below).
+# Do not commit .env. QueryShield reads secrets from the environment only.
 
 python -m queryshield.start
 ```
 
-Generate a Fernet key for `VAULT_KEY` once and never lose it:
+Generate a Fernet key for `VAULT_KEY` once and never lose it. Credential
+encryption and session signing both require `VAULT_KEY` (or `SESSION_KEY`
+for cookies). If it is unset, those operations fail instead of using a
+built-in key:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -50,7 +54,7 @@ curl -X POST localhost:8000/v1/databases \
   -d '{
     "alias": "prod",
     "db_type": "postgresql",
-    "connection_string": "postgresql://reader:secret@db.acme.internal:5432/app",
+    "connection_string": "postgresql://READER:PASSWORD@db.example.internal:5432/app",
     "allowed_tables": ["users", "orders"]
   }'
 
