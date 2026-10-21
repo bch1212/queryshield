@@ -158,6 +158,7 @@ LANDING_HTML = (
         <span class="brand">QueryShield</span>
         <span class="links">
             <a href="/login">Log in</a>
+            <a href="/suite">Suite</a>
             <a href="/docs">API</a>
             <a href="/aeo/guides">Guides</a>
             <a href="https://github.com/bch1212/queryshield">GitHub</a>
@@ -171,6 +172,7 @@ LANDING_HTML = (
         <p>
             <span class="pill">SELECT-only AST validator</span>
             <span class="pill">Per-agent RLS</span>
+            <span class="pill">Credential vault</span>
             <span class="pill">Append-only audit</span>
             <span class="pill">MCP-native</span>
         </p>
@@ -185,7 +187,7 @@ LANDING_HTML = (
             <input id="workspace" name="workspace" type="text" placeholder="Acme">
             <p style="margin: 18px 0 0;"><button type="submit" class="btn">Create my workspace</button></p>
         </form>
-        <p class="muted" style="margin-top: 16px;">Free tier: 3 databases · 1M queries/month · no credit card.</p>
+        <p class="muted" style="margin-top: 16px;">One <span class="kbd">qs_</span> API key for the SQL proxy and the credential vault. Creating a workspace does not charge a card; Starter limits apply until you subscribe, and that subscription is the only Stripe customer. The free funnel is <a href="https://injectshield.dev">InjectShield</a>.</p>
     </div>
 
     <h2>What is a secure SQL proxy for AI agents?</h2>
@@ -231,17 +233,98 @@ LANDING_HTML = (
     </ul>
     <p><a href="/aeo/guides">Browse all guides &rarr;</a></p>
 
+    <h2>The agent security suite</h2>
+    <p>QueryShield is the lead product: one brand, one <span class="kbd">qs_</span> API key, one Stripe customer, and this site. Two capabilities ship here.</p>
+    <ul>
+        <li><strong>SQL proxy.</strong> Natural language or SELECT in, AST checks, row-level security, and an audit log. Agents never see database connection strings.</li>
+        <li><strong>Credential vault.</strong> Named secrets (the former AgentVault) encrypted with the same <span class="kbd">VAULT_KEY</span>. An agent reads only the names its permission patterns allow, through <span class="kbd">POST /v1/vault/get/{name}</span>.</li>
+    </ul>
+    <p>The free tier is <a href="https://injectshield.dev">InjectShield</a>, a prompt-injection scanner for untrusted text. It stays a separate service and funnels teams here when they need a database proxy or a credential vault. Source and docs: <a href="https://github.com/bch1212/injectshield">github.com/bch1212/injectshield</a> · <a href="https://injectshield.dev/docs">injectshield.dev/docs</a> · API <a href="https://api.injectshield.dev">api.injectshield.dev</a>.</p>
+    <p><a href="/suite">Suite overview</a></p>
+
     <h2>Pricing</h2>
     <table>
-        <thead><tr><th>Tier</th><th>Monthly</th><th>Databases</th><th>Queries/month</th></tr></thead>
+        <thead><tr><th>Tier</th><th>Monthly</th><th>Databases</th><th>Credentials</th><th>Queries/month</th></tr></thead>
         <tbody>
-            <tr><td>Starter</td><td>$500</td><td>3</td><td>1M</td></tr>
-            <tr><td>Pro</td><td>$1,500</td><td>10</td><td>10M (audit export)</td></tr>
-            <tr><td>Enterprise</td><td>$3,500</td><td>unlimited</td><td>SSO + SIEM webhook</td></tr>
+            <tr><td>InjectShield</td><td>Free</td><td>—</td><td>—</td><td>prompt-injection scans</td></tr>
+            <tr><td>Starter</td><td>$500</td><td>3</td><td>25</td><td>1M</td></tr>
+            <tr><td>Pro</td><td>$1,500</td><td>10</td><td>100</td><td>10M (audit export)</td></tr>
+            <tr><td>Enterprise</td><td>$3,500</td><td>unlimited</td><td>unlimited</td><td>SSO + SIEM webhook</td></tr>
         </tbody>
     </table>
+    <p class="muted">QueryShield tiers share one Stripe customer. InjectShield sign-up is separate and free: <a href="https://injectshield.dev">injectshield.dev</a>.</p>
 
-    <p class="muted" style="margin-top: 48px;">Docs: <a href="/docs">/docs</a> · Health: <a href="/health">/health</a> · <a href="https://github.com/bch1212/queryshield">github.com/bch1212/queryshield</a></p>
+    <p class="muted" style="margin-top: 48px;">Suite: <a href="/suite">/suite</a> · API: <a href="/docs">/docs</a> · Health: <a href="/health">/health</a> · <a href="https://github.com/bch1212/queryshield">github.com/bch1212/queryshield</a></p>
+</div>
+</body>
+</html>
+"""
+)
+
+
+SUITE_HTML = (
+    """<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>QueryShield suite — SQL proxy, credential vault, InjectShield</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="QueryShield is the agent security suite: a paid SQL proxy and credential vault under one API key and one Stripe customer. InjectShield is the free prompt-injection funnel.">
+    <style>"""
+    + _BASE_CSS
+    + """
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <nav class="nav">
+        <span class="brand"><a href="/">QueryShield</a></span>
+        <span class="links">
+            <a href="/suite">Suite</a>
+            <a href="/docs">API</a>
+            <a href="/aeo/guides">Guides</a>
+            <a href="https://github.com/bch1212/queryshield">GitHub</a>
+        </span>
+    </nav>
+
+    <h1>One suite</h1>
+    <p class="tag">QueryShield is the lead product. Agents use one <span class="kbd">qs_</span> API key. Billing is one Stripe customer on the QueryShield prices. This site is the docs.</p>
+
+    <h2>SQL proxy</h2>
+    <p>Register a database with the admin key. The connection string is Fernet-encrypted and never returned by the API. Agents call <span class="kbd">POST /v1/query</span> in natural language or as a single SELECT. The AST validator, row-level security, and the append-only query audit run before any rows leave the database.</p>
+
+    <h2>Credential vault</h2>
+    <p>Named secrets — the AgentVault product, now a feature of this proxy. Store them with the admin key. Grant an agent fnmatch patterns such as <span class="kbd">stripe_*</span>. The agent reads a value with its existing API key. An empty pattern list grants nothing.</p>
+    <pre><code># Store (admin). The response has metadata only.
+curl -X POST $BASE/v1/credentials \\
+  -H "X-Admin-Key: qs_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"openai_key","provider":"openai","value":"YOUR_SECRET"}'
+
+# Let one agent read it. Same key family as /v1/query.
+curl -X POST $BASE/v1/agents \\
+  -H "X-Admin-Key: qs_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"writer","tenant_id":"TENANT","credential_permissions":["openai_key"],"budget_daily":5}'
+
+# Reveal (agent). ttl_seconds is advisory — discard the value after use.
+curl -X POST $BASE/v1/vault/get/openai_key \\
+  -H "X-API-Key: qs_..."</code></pre>
+    <p>Database connection strings are a different store. <span class="kbd">/v1/vault/get</span> cannot read them. Access logs record the agent, credential id, and outcome, never the secret. Encryption key: <span class="kbd">VAULT_KEY</span> only. If it is unset, credential routes fail closed.</p>
+    <p>MCP tools <span class="kbd">list_credentials</span> and <span class="kbd">get_credential</span> use <span class="kbd">QUERYSHIELD_API_KEY</span>. OpenAPI for every route is at <a href="/docs">/docs</a>.</p>
+
+    <h2>Free tier: InjectShield</h2>
+    <p>InjectShield scans untrusted text for prompt injection before it reaches an agent. It is the free funnel into this suite. Its code stays in its own repository.</p>
+    <ul>
+        <li>Product: <a href="https://injectshield.dev">https://injectshield.dev</a></li>
+        <li>Docs: <a href="https://injectshield.dev/docs">https://injectshield.dev/docs</a></li>
+        <li>API: <a href="https://api.injectshield.dev">https://api.injectshield.dev</a></li>
+        <li>Source: <a href="https://github.com/bch1212/injectshield">https://github.com/bch1212/injectshield</a></li>
+    </ul>
+    <p>A team starts with a free InjectShield key, then creates one QueryShield workspace when agents need a database or a vault. QueryShield does not issue a second key prefix and does not open a second Stripe customer for the vault.</p>
+
+    <h2>What stayed behind</h2>
+    <p>AgentVault's separate user directory, Clerk login, <span class="kbd">avk_</span> keys, and its own Stripe products (Free / Pro $49 / Business $149 / Enterprise $499) are not part of this service. Budgets and credential caps ride on the QueryShield tiers you already sell.</p>
 </div>
 </body>
 </html>
@@ -481,6 +564,28 @@ DASHBOARD_HTML = (
         </details>
     </div>
 
+    <h2>Credential vault</h2>
+    <p class="muted">Named secrets for agents (API keys, tokens). Values are encrypted at rest and are not shown again after you save them. Grant access with credential permission patterns on the API — an agent with an empty list cannot read any secret. Database connection strings stay in the section above and are never returned to agents.</p>
+    <div class="card">
+        <table id="cred-table">
+            <thead><tr><th>Name</th><th>Provider</th><th>Created</th><th></th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <details style="margin-top: 16px;">
+            <summary class="muted" style="cursor:pointer;">+ Store a credential</summary>
+            <div style="margin-top: 12px;">
+                <label>Name</label>
+                <input id="cred-name" type="text" placeholder="openai_key">
+                <label>Provider (optional)</label>
+                <input id="cred-provider" type="text" placeholder="openai">
+                <label>Value (write-only)</label>
+                <input id="cred-value" type="password" placeholder="paste the secret once" autocomplete="off">
+                <button class="btn secondary" onclick="storeCredential()">Store</button>
+                <div id="cred-result"></div>
+            </div>
+        </details>
+    </div>
+
     <h2>Recent activity</h2>
     <div class="card">
         <table id="audit-table">
@@ -529,6 +634,17 @@ async function load() {
             <td><button class="btn secondary" onclick="rotate('${a.id}', '${esc(a.name)}')">Rotate</button></td>
         </tr>
     `).join("") || `<tr><td colspan="4" class="muted">No agents yet.</td></tr>`;
+
+    const creds = document.querySelector("#cred-table tbody");
+    const credRows = d.credentials || [];
+    creds.innerHTML = credRows.map(c => `
+        <tr>
+            <td><span class="kbd">${esc(c.name)}</span></td>
+            <td>${esc(c.provider || "")}</td>
+            <td class="muted">${c.created_at ? c.created_at.slice(0,10) : ""}</td>
+            <td><button class="btn secondary" onclick="deleteCredential('${esc(c.id)}', '${esc(c.name)}')">Remove</button></td>
+        </tr>
+    `).join("") || `<tr><td colspan="4" class="muted">No named credentials yet.</td></tr>`;
 
     const dbs = document.querySelector("#db-table tbody");
     dbs.innerHTML = d.databases.map(x => `
@@ -597,6 +713,28 @@ async function registerDb() {
     load();
 }
 
+async function storeCredential() {
+    const name = document.getElementById("cred-name").value.trim();
+    const provider = document.getElementById("cred-provider").value.trim();
+    const value = document.getElementById("cred-value").value;
+    if (!name || !value) { alert("Name and value are required."); return; }
+    const fd = new FormData();
+    fd.append("name", name); fd.append("provider", provider); fd.append("value", value);
+    const r = await fetch("/dashboard/credentials", { method: "POST", body: fd, credentials: "same-origin" });
+    if (!r.ok) { document.getElementById("cred-result").innerHTML = `<p class="error">${esc(await r.text())}</p>`; return; }
+    document.getElementById("cred-result").innerHTML = `<p class="muted">Stored. The value is not shown again.</p>`;
+    document.getElementById("cred-name").value = "";
+    document.getElementById("cred-provider").value = "";
+    document.getElementById("cred-value").value = "";
+    load();
+}
+
+async function deleteCredential(id, name) {
+    if (!confirm(`Remove credential "${name}"? Agents will no longer be able to read it.`)) return;
+    await fetch("/dashboard/credentials/" + encodeURIComponent(id), { method: "DELETE", credentials: "same-origin" });
+    load();
+}
+
 async function deleteDb(alias) {
     if (!confirm(`Remove database "${alias}"? Stored credentials will be deleted.`)) return;
     await fetch("/dashboard/databases/" + encodeURIComponent(alias), { method: "DELETE", credentials: "same-origin" });
@@ -636,8 +774,10 @@ _GUIDE_CTA = (
     'natural language in, SELECT-only validated SQL out, per-agent row-level '
     'security, and an append-only audit log. Your agents never see connection '
     'strings.</p>'
-    '<p><a class="btn" href="/">Get an API key — free tier</a> '
-    '<a class="btn secondary" href="/docs">Read the API docs</a></p>'
+    '<p><a class="btn" href="/">Get a QueryShield API key</a> '
+    '<a class="btn secondary" href="/suite">Suite overview</a></p>'
+    '<p class="muted">Free prompt-injection scans: '
+    '<a href="https://injectshield.dev">InjectShield</a>.</p>'
     '</div>'
 )
 

@@ -93,6 +93,41 @@ async def query_database_sql(
 
 
 @mcp.tool()
+async def list_credentials() -> dict[str, Any]:
+    """List credential names this agent is allowed to read.
+
+    Names only — never values. Database connection strings are not included.
+    """
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            f"{_base_url()}/v1/vault/credentials",
+            headers={"X-API-Key": _api_key()},
+        )
+        if r.status_code >= 400:
+            return {"error": r.text, "status": r.status_code}
+        return r.json()
+
+
+@mcp.tool()
+async def get_credential(name: str, cost: float = 0.0) -> dict[str, Any]:
+    """Read one named credential the agent is permitted to use.
+
+    ``cost`` is charged against the agent's daily and monthly vault budget
+    when those caps are set. The value is in the response only; discard it
+    when ``ttl_seconds`` elapses. QueryShield does not log the value.
+    """
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{_base_url()}/v1/vault/get/{name}",
+            headers={"X-API-Key": _api_key()},
+            params={"cost": cost},
+        )
+        if r.status_code >= 400:
+            return {"error": r.text, "status": r.status_code}
+        return r.json()
+
+
+@mcp.tool()
 async def get_audit_log(limit: int = 50) -> dict[str, Any]:
     """Recent audit entries for the calling agent.
 

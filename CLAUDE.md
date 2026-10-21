@@ -1,19 +1,25 @@
 # QueryShield — Claude Code Context
 
 ## What this is
-Secure SQL proxy between AI agents and customer databases. Agents POST to
-`/v1/query` in NL or structured SQL. QueryShield validates → translates →
-applies row-level security → executes → audits. Agents never see connection
-strings.
+Lead product of one agent security suite. Agents POST to `/v1/query` in NL
+or structured SQL. QueryShield validates → translates → applies row-level
+security → executes → audits. The same `qs_` API key and the same Stripe
+customer also cover the named credential vault (`credentials.py`), ported
+from AgentVault. InjectShield (https://github.com/bch1212/injectshield,
+https://injectshield.dev) is the free prompt-injection funnel and is not
+vendored here. Agents never see database connection strings.
 
 ## Architecture
 - `proxy.py` — engine. Every query flows through `execute_query()`.
 - `safety.py` — sqlglot AST validator. **Never use keyword filtering.**
 - `rls.py` — AST-level WHERE injection + schema/table whitelists. Never
   string concat.
-- `vault.py` — Fernet-encrypted credential store, in our internal Postgres.
-  Replaces AWS Secrets Manager from the original spec (Brett's stack uses
-  Railway, no AWS).
+- `vault.py` — Fernet-encrypted database connection strings, in our internal
+  Postgres. Replaces AWS Secrets Manager from the original spec (Brett's
+  stack uses Railway, no AWS). Never returned by any API.
+- `credential_crypto.py` / `credentials.py` / `credential_api.py` — named
+  secret vault (AgentVault folded in). Same `VAULT_KEY`, same tenant, same
+  `qs_` key. Empty permission patterns fail closed. Audit metadata only.
 - `nl_to_sql.py` — Claude tool_use loop with `get_schema` + `validate_query`
   tools. Prompt caching on system + schema.
 - `schema.py` — DB introspection with two-tier cache (in-process + Redis).
@@ -36,9 +42,10 @@ strings.
   in depth — even if safety + RLS were bypassed, the DB would refuse writes.
 
 ## Pricing tiers (`models.TIER_LIMITS`)
-- Starter: $500/mo · 3 DBs · 1M queries/mo
-- Pro: $1,500/mo · 10 DBs · 10M queries/mo · audit export
+- Starter: $500/mo · 3 DBs · 25 credentials · 1M queries/mo
+- Pro: $1,500/mo · 10 DBs · 100 credentials · 10M queries/mo · audit export
 - Enterprise: $3,500/mo · unlimited · SSO, SIEM webhook
+- InjectShield is the free funnel, not a QueryShield Stripe price.
 
 ## MRR target
 $32.5K @ 15 customers (10 Pro + 5 Enterprise). First 3 customers =

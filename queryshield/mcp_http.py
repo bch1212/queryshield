@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from queryshield.audit import get_agent_logs
 from queryshield.billing import check_quota, increment_quota
+from queryshield.credentials import CredentialError, list_available_names, reveal_credential
 from queryshield.models import Agent, QueryRequest, SessionLocal, hash_api_key
 from queryshield.proxy import execute_query
 
@@ -123,6 +124,25 @@ def build_mcp_app():  # type: ignore[no-untyped-def]
             return {"error": str(e)}
         increment_quota(agent.tenant_id, by=1)
         return result.model_dump(mode="json")
+
+    @mcp.tool()
+    async def list_credentials() -> dict[str, Any]:
+        """List credential names this agent is allowed to read."""
+        agent = _agent_or_raise()
+        try:
+            names = list_available_names(agent.id)
+        except CredentialError as e:
+            return {"error": e.detail, "status": e.status_code}
+        return {"credentials": names}
+
+    @mcp.tool()
+    async def get_credential(name: str, cost: float = 0.0) -> dict[str, Any]:
+        """Read one named credential this agent is permitted to use."""
+        agent = _agent_or_raise()
+        try:
+            return reveal_credential(agent.id, name, cost=cost)
+        except CredentialError as e:
+            return {"error": e.detail, "status": e.status_code}
 
     @mcp.tool()
     async def get_audit_log(limit: int = 50) -> dict[str, Any]:
